@@ -93,7 +93,7 @@ $exe = (Resolve-Path '.\src-tauri\target\release\codex-quota-sync.exe').Path
 1. 完全退出并重新打开 Codex；
 2. 在 Codex 中打开 `/hooks`；
 3. 找到状态消息为 `Codex Quota Sync: updating activity` 的命令；
-4. 确认命令只指向上述 exe 并带 `--activity-hook`；
+4. 确认 Windows 命令通过 `cmd.exe /d /s /c call` 启动上述 exe，应用参数只有 `--activity-hook`；
 5. 审查并信任；
 6. 新建任务，确认 `%APPDATA%\CodexQuotaSync\activity.json` 出现；
 7. 触发一次工具审批，展开卡片确认“待审批”数量变化。

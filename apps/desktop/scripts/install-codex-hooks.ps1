@@ -100,14 +100,15 @@ function Add-ManagedGroup {
         [System.Collections.IDictionary]$Hooks,
         [string]$EventName,
         [AllowNull()][string]$Matcher,
-        [string]$Command
+        [string]$Command,
+        [string]$CommandWindows
     )
 
     Remove-ManagedHandlers -Hooks $Hooks -EventName $EventName
     $handler = [ordered]@{
         type          = 'command'
         command       = $Command
-        commandWindows = $Command
+        commandWindows = $CommandWindows
         timeout       = 5
         statusMessage = $marker
     }
@@ -194,13 +195,14 @@ if (-not ($document['hooks'] -is [System.Collections.IDictionary])) {
 }
 
 $command = '"' + $resolvedExecutable + '" --activity-hook'
+$commandWindows = 'cmd.exe /d /s /c call "' + $resolvedExecutable + '" --activity-hook'
 $hooks = $document['hooks']
-Add-ManagedGroup -Hooks $hooks -EventName 'SessionStart' -Matcher 'startup|resume|clear' -Command $command
-Add-ManagedGroup -Hooks $hooks -EventName 'UserPromptSubmit' -Matcher $null -Command $command
-Add-ManagedGroup -Hooks $hooks -EventName 'PermissionRequest' -Matcher '*' -Command $command
-Add-ManagedGroup -Hooks $hooks -EventName 'PreToolUse' -Matcher '(^|__)request_user_input$' -Command $command
-Add-ManagedGroup -Hooks $hooks -EventName 'PostToolUse' -Matcher '*' -Command $command
-Add-ManagedGroup -Hooks $hooks -EventName 'Stop' -Matcher $null -Command $command
+Add-ManagedGroup -Hooks $hooks -EventName 'SessionStart' -Matcher 'startup|resume|clear' -Command $command -CommandWindows $commandWindows
+Add-ManagedGroup -Hooks $hooks -EventName 'UserPromptSubmit' -Matcher $null -Command $command -CommandWindows $commandWindows
+Add-ManagedGroup -Hooks $hooks -EventName 'PermissionRequest' -Matcher '*' -Command $command -CommandWindows $commandWindows
+Add-ManagedGroup -Hooks $hooks -EventName 'PreToolUse' -Matcher '(^|__)request_user_input$' -Command $command -CommandWindows $commandWindows
+Add-ManagedGroup -Hooks $hooks -EventName 'PostToolUse' -Matcher '*' -Command $command -CommandWindows $commandWindows
+Add-ManagedGroup -Hooks $hooks -EventName 'Stop' -Matcher $null -Command $command -CommandWindows $commandWindows
 
 $json = $document | ConvertTo-Json -Depth 100
 if ($PSCmdlet.ShouldProcess($hooksPath, '安全合并 Codex Quota Sync 活动跟踪 hooks')) {
