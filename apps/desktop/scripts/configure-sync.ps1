@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
     [ValidateSet('collector', 'viewer')]
@@ -61,13 +61,13 @@ $defaults = [ordered]@{
 
 if (Test-Path -LiteralPath $ConfigPath -PathType Leaf) {
     try {
-        $existing = Get-Content -Raw -LiteralPath $ConfigPath | ConvertFrom-Json -AsHashtable
+        $existing = Get-Content -Raw -LiteralPath $ConfigPath | ConvertFrom-Json
     }
     catch {
         throw "现有配置不是有效 JSON，未作修改：$($_.Exception.Message)"
     }
-    foreach ($key in $existing.Keys) {
-        $defaults[$key] = $existing[$key]
+    foreach ($property in $existing.PSObject.Properties) {
+        $defaults[$property.Name] = $property.Value
     }
 }
 

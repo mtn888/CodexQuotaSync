@@ -12,6 +12,36 @@
 
 ## 2. 从源码构建
 
+推荐在仓库根目录直接双击：
+
+```text
+update-build-all.cmd
+```
+
+也可以在 PowerShell 中运行同一入口：
+
+```powershell
+.\update-build-all.ps1
+```
+
+默认流程会自动完成：
+
+1. 安装/更新前端依赖并运行前端、Rust 测试；
+2. 生成 Windows Release EXE、MSI 和 NSIS；
+3. 从现有 Collector 配置读取服务器地址，生成 Windows viewer 便携 ZIP；
+4. 运行 Android 单元测试，生成并验证已调试签名的 Debug APK；
+5. 重新启动仓库内的 Collector。
+
+脚本不会重新配置 Collector，因此现有 NAS 地址、`sourceId` 和写入密钥都会保留；日志只显示密钥是否存在，不显示内容。日常更新也不会修改或重新信任 Hooks。只有首次安装 Hooks 或 Release EXE 的绝对路径发生变化时才运行：
+
+```powershell
+.\update-build-all.ps1 -InstallHooks
+```
+
+可选的 `-UpdateSource` 会先执行 `git pull --ff-only`，但只允许在完全干净的工作区运行，不会自动 stash/reset。`-SkipTests`、`-SkipViewer`、`-SkipAndroid` 和 `-NoRestart` 可用于临时跳过对应步骤。
+
+以下是脚本内部执行的手动等价流程：
+
 ```powershell
 Set-Location '<仓库根目录>\apps\desktop'
 npm install
@@ -32,6 +62,8 @@ npm run tauri -- build
 apps\desktop\src-tauri\target\release\codex-quota-sync.exe
 apps\desktop\src-tauri\target\release\bundle\msi\
 apps\desktop\src-tauri\target\release\bundle\nsis\
+dist\CodexQuotaSync-viewer-<版本>-win-x64.zip
+dist\CodexQuotaSync-android-<版本>-debug.apk
 ```
 
 只需要快速调试可执行文件时：
@@ -109,6 +141,22 @@ $exe = (Resolve-Path '.\src-tauri\target\release\codex-quota-sync.exe').Path
   -Role viewer `
   -ServerUrl 'http://nas.example.com:18080' `
   -SourceId 'windows-viewer-laptop'
+```
+
+也可以在仓库根目录直接生成便携版压缩包：
+
+```powershell
+.\package-windows-viewer.ps1
+```
+
+默认输出到 `dist\CodexQuotaSync-viewer-<版本>-win-x64.zip`。脚本会把 release EXE、viewer 配置脚本和服务器地址一起打包。其他电脑完整解压后，右键运行 `setup-windows-viewer.ps1` 即可自动生成设备标识、配置 viewer、检查服务器并启动悬浮框。
+
+打包脚本和包内初始化脚本兼容 Windows PowerShell 5.1 与 PowerShell 7。初始化脚本可以重复运行；已有配置会先备份为 `preferences.json.bak`。
+
+需要临时更换打包进去的服务器地址时：
+
+```powershell
+.\package-windows-viewer.ps1 -ServerUrl 'http://nas.example.com:18080'
 ```
 
 viewer 每分钟读取 `/v1/status`。连接失败时继续显示进程内最后一份远端快照并标为离线；`collectedAt` 超过 15 分钟后标为过期。重启 viewer 且服务器仍离线时，因为桌面端不把远端 JSON 持久化到磁盘，会显示不可用，直到服务器恢复。

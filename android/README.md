@@ -23,7 +23,19 @@
 
 ## 构建与测试
 
-在 Windows PowerShell 中执行：
+推荐在仓库根目录双击 `update-build-all.cmd`，它会同时生成 Windows、Windows viewer 和 Android 产物；也可以在 PowerShell 中运行：
+
+```powershell
+.\update-build-all.ps1
+```
+
+经过签名验证并重命名后的 APK 会复制到：
+
+```text
+dist\CodexQuotaSync-android-<版本>-debug.apk
+```
+
+只构建 Android 或需要手动排查时，在 Windows PowerShell 中执行：
 
 ```powershell
 Set-Location '<仓库根目录>\android'
