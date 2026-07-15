@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>Codex Quota Sync Server</Name>
+  <Repository>codex-quota-sync-server:local</Repository>
+  <Registry/>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/mtn888/CodexQuotaSync/issues</Support>
+  <Project>https://github.com/mtn888/CodexQuotaSync</Project>
+  <Overview>Codex Quota Sync 的轻量 HTTP 最新快照服务。公开读取状态，使用 HMAC-SHA256 保护写入，不使用数据库。</Overview>
+  <Category>Tools:</Category>
+  <WebUI>http://[IP]:[PORT:8787]/healthz</WebUI>
+  <TemplateURL/>
+  <Icon/>
+  <ExtraParams>--restart unless-stopped --security-opt=no-new-privileges --read-only --tmpfs /tmp:rw,noexec,nosuid,size=16m</ExtraParams>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires>请先按照 server/README.md 在 UnRaid 上构建本地镜像 codex-quota-sync-server:local。</Requires>
+  <Config Name="Web Port" Target="8787" Default="8787" Mode="tcp" Description="HTTP 公网/局域网访问端口；可以修改 Host 端口。" Type="Port" Display="always" Required="true" Mask="false">8787</Config>
+  <Config Name="Data" Target="/data" Default="/mnt/user/appdata/codex-quota-sync/data" Mode="rw" Description="状态文件持久化目录。" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/codex-quota-sync/data</Config>
+  <Config Name="Write Secret" Target="CQS_WRITE_SECRET" Default="" Mode="" Description="collector 与服务器共享的随机写密钥，建议 openssl rand -hex 32。" Type="Variable" Display="always" Required="true" Mask="true"></Config>
+  <Config Name="Timezone" Target="TZ" Default="Asia/Singapore" Mode="" Description="IANA 时区名称。" Type="Variable" Display="always" Required="true" Mask="false">Asia/Singapore</Config>
+  <Config Name="Listen Port" Target="PORT" Default="8787" Mode="" Description="容器内部监听端口，应与 Web Port 的 Container Port 一致。" Type="Variable" Display="advanced-hide" Required="true" Mask="false">8787</Config>
+  <Config Name="Data File" Target="DATA_FILE" Default="/data/state.json" Mode="" Description="容器内状态文件路径。" Type="Variable" Display="advanced-hide" Required="true" Mask="false">/data/state.json</Config>
+</Container>

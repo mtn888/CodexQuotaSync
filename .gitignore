@@ -1,0 +1,34 @@
+# 参考仓库仅用于实现核对，不纳入最终项目
+reference/
+
+# 构建产物与本地配置
+**/node_modules/
+**/dist/
+**/target/
+**/.gradle/
+**/build/
+**/local.properties
+**/.idea/
+.codebase-memory/
+.codex/
+*.log
+*.keystore
+*.jks
+*.pem
+id_rsa
+id_rsa.*
+**/auth.json
+**/credentials.json
+**/token.json
+.env
+.env.*
+!.env.example
+
+# 未被当前产品使用的上游展示材料
+apps/desktop/Codex.png
+apps/desktop/docs/images/
+
+# 本地代理规划与执行记录，不属于产品源码
+findings.md
+progress.md
+task_plan.md

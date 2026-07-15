@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Codex Quota Sync</string>
+    <string name="config_title">配置 Codex Quota Sync</string>
+    <string name="config_description">输入 UnRaid 同步服务的 HTTP 地址。应用只会读取 /v1/status，不需要也不会保存写入密钥。</string>
+    <string name="base_url_label">服务器 Base URL</string>
+    <string name="base_url_hint">http://example.com:18080</string>
+    <string name="save_and_refresh">保存并刷新小组件</string>
+    <string name="config_saved">配置已保存，正在刷新</string>
+    <string name="widget_description">显示 Codex 额度、重置时间和任务状态</string>
+    <string name="refresh">立即刷新</string>
+    <string name="open_settings">打开设置</string>
+</resources>

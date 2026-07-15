@@ -1,0 +1,46 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Codex Quota Sync",
+  "version": "0.1.5",
+  "identifier": "io.github.mtn888.codexquotasync",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "macOSPrivateApi": true,
+    "windows": [
+      {
+        "label": "widget",
+        "title": "Codex Quota Sync",
+        "width": 88,
+        "height": 88,
+        "minWidth": 88,
+        "minHeight": 88,
+        "maxWidth": 328,
+        "maxHeight": 328,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "backgroundColor": "#00000000",
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": false,
+        "visible": true
+      }
+    ],
+    "security": { "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:" }
+  },
+  "bundle": {
+    "active": true,
+    "createUpdaterArtifacts": false,
+    "targets": "all",
+    "category": "Utility",
+    "shortDescription": "Cross-device Codex quota at a glance",
+    "longDescription": "A lightweight floating desktop card for synchronized Codex quota, reset time, and active task counts.",
+    "copyright": "Copyright Codex Quota Sync contributors",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"]
+  }
+}

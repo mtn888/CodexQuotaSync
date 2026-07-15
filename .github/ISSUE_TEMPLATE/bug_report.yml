@@ -1,0 +1,40 @@
+name: 缺陷报告
+description: 报告可复现的 Codex Quota Sync 问题
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: 请勿提交 token、写密钥、完整 preferences.json、原始用量响应或含个人信息的截图。
+  - type: dropdown
+    id: component
+    attributes:
+      label: 组件
+      options:
+        - Windows collector
+        - Windows viewer
+        - UnRaid 服务端
+        - Android 小组件
+        - Codex Hooks
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: 请给出最小、可重复的步骤。
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期与实际结果
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 环境
+      placeholder: 系统版本、应用版本、部署方式；请脱敏。
+    validations:
+      required: true

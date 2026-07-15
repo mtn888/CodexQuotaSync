@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex-quota-sync.local/schema/status-v1.schema.json",
+  "title": "Codex Quota Sync Status v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "sourceId",
+    "revision",
+    "collectorVersion",
+    "collectedAt",
+    "activity",
+    "latestAttempt",
+    "lastGoodSnapshot"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "sourceId": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "revision": { "type": "integer", "minimum": 0 },
+    "collectorVersion": { "type": "string", "minLength": 1, "maxLength": 32 },
+    "collectedAt": { "type": "string", "format": "date-time" },
+    "receivedAt": { "type": "string", "format": "date-time" },
+    "activity": { "$ref": "#/$defs/activity" },
+    "latestAttempt": { "$ref": "#/$defs/attempt" },
+    "lastGoodSnapshot": {
+      "oneOf": [
+        { "$ref": "#/$defs/providerSnapshot" },
+        { "type": "null" }
+      ]
+    }
+  },
+  "$defs": {
+    "activity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "executing",
+        "waitingOnApproval",
+        "waitingOnUserInput",
+        "source",
+        "observedAt",
+        "stale"
+      ],
+      "properties": {
+        "executing": { "type": "integer", "minimum": 0 },
+        "waitingOnApproval": { "type": "integer", "minimum": 0 },
+        "waitingOnUserInput": { "type": "integer", "minimum": 0 },
+        "source": { "enum": ["hooks", "unavailable"] },
+        "observedAt": { "type": "string", "format": "date-time" },
+        "stale": { "type": "boolean" }
+      }
+    },
+    "attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "attemptedAt"],
+      "properties": {
+        "status": { "enum": ["ok", "stale", "signed_out", "unavailable"] },
+        "message": { "type": ["string", "null"], "maxLength": 512 },
+        "attemptedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "usageWindow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["remainingPercent", "resetsAt", "windowSeconds"],
+      "properties": {
+        "remainingPercent": { "type": "number", "minimum": 0, "maximum": 100 },
+        "resetsAt": { "type": ["string", "null"], "format": "date-time" },
+        "windowSeconds": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "providerSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "displayName",
+        "plan",
+        "shortWindow",
+        "weeklyWindow",
+        "resetCredits",
+        "resetCreditExpiresAt",
+        "updatedAt",
+        "status",
+        "message",
+        "nextResetAt",
+        "nextResetWindow"
+      ],
+      "properties": {
+        "provider": { "const": "codex" },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "plan": { "type": ["string", "null"], "maxLength": 64 },
+        "shortWindow": {
+          "oneOf": [
+            { "$ref": "#/$defs/usageWindow" },
+            { "type": "null" }
+          ]
+        },
+        "weeklyWindow": {
+          "oneOf": [
+            { "$ref": "#/$defs/usageWindow" },
+            { "type": "null" }
+          ]
+        },
+        "resetCredits": { "type": ["integer", "null"], "minimum": 0 },
+        "resetCreditExpiresAt": {
+          "type": "array",
+          "maxItems": 64,
+          "items": { "type": "string", "format": "date-time" }
+        },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "status": { "enum": ["ok", "stale", "signed_out", "unavailable"] },
+        "message": { "type": ["string", "null"], "maxLength": 512 },
+        "nextResetAt": { "type": ["string", "null"], "format": "date-time" },
+        "nextResetWindow": { "enum": ["5h", "weekly", null] }
+      }
+    }
+  }
+}

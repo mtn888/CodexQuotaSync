@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- 用户的 NAS 地址运行在自定义 HTTP 端口，因此允许明文连接。 -->
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

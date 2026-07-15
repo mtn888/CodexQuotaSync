@@ -1,0 +1,8 @@
+.git
+.gitignore
+data
+*.md
+*_test.go
+unraid
+docker-compose.yml
+Dockerfile*

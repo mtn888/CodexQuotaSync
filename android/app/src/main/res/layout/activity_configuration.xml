@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFF5F7F6"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/config_title"
+            android:textColor="#FF173F35"
+            android:textSize="26sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:lineSpacingExtra="3dp"
+            android:text="@string/config_description"
+            android:textColor="#FF52615B"
+            android:textSize="15sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:labelFor="@id/input_base_url"
+            android:text="@string/base_url_label"
+            android:textColor="#FF263B34"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/input_base_url"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:autofillHints="none"
+            android:hint="@string/base_url_hint"
+            android:importantForAutofill="no"
+            android:inputType="textUri"
+            android:maxLines="2"
+            android:paddingBottom="12dp"
+            android:paddingTop="12dp"
+            android:selectAllOnFocus="true"
+            android:textColor="#FF15251F"
+            android:textColorHint="#FF87948F" />
+
+        <TextView
+            android:id="@+id/text_validation_error"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textColor="#FFC0392B"
+            android:textSize="13sp"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/button_save"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="24dp"
+            android:text="@string/save_and_refresh"
+            android:textAllCaps="false"
+            android:textSize="16sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:background="#FFE6EEEB"
+            android:lineSpacingExtra="3dp"
+            android:padding="16dp"
+            android:text="更新说明\n• 系统后台每 15 分钟尝试一次\n• 点击小组件右上角按钮可立即刷新\n• Android 省电策略可能延迟后台任务"
+            android:textColor="#FF52615B"
+            android:textSize="14sp" />
+    </LinearLayout>
+</ScrollView>
