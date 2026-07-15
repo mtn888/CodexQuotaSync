@@ -187,11 +187,11 @@ button { font: inherit; }
 .quota-card.activity-tone--idle,
 .quota-orb.activity-tone--idle { --cool: #aeb8c3; --glow: #e3e7ea; --warm: #c9cfd5; --linear-warm: #d7dce1; --linear-end: #eef1f3; --aurora-opacity: .42; background: rgba(223,227,231,.88); }
 .quota-card.activity-tone--running,
-.quota-orb.activity-tone--running { --cool: #4fae7b; --glow: #bce8cd; --warm: #70c994; --linear-warm: #bfe4ce; --linear-end: #e5f5eb; --aurora-opacity: .68; background: rgba(177,224,196,.9); }
+.quota-orb.activity-tone--running { --cool: #287a4e; --glow: #86cba2; --warm: #3f9f68; --linear-warm: #82bd99; --linear-end: #cae7d5; --aurora-opacity: .7; --activity-surface: rgba(76,168,112,.94); background: var(--activity-surface); }
 .quota-card.activity-tone--pending,
 .quota-orb.activity-tone--pending { --cool: #d7b44d; --glow: #fff0a8; --warm: #edc85e; --linear-warm: #eadfb4; --linear-end: #fff8dc; --aurora-opacity: .62; background: rgba(250,232,167,.92); }
 .quota-orb.activity-tone--idle.quota-orb--idle { background: rgba(223,227,231,.78); }
-.quota-orb.activity-tone--running.quota-orb--idle { background: rgba(201,231,213,.82); }
+.quota-orb.activity-tone--running.quota-orb--idle { background: var(--activity-surface); }
 .quota-orb.activity-tone--pending.quota-orb--idle { background: rgba(250,232,167,.84); }
 .quota-orb .aurora { inset: -55%; opacity: var(--aurora-opacity, .55); }
 .orb-weekly-badge { position: absolute; z-index: 2; top: 0; left: 50%; width: 52px; height: 20px; transform: translateX(-50%); color: #fff; }
