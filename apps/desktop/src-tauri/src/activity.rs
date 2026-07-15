@@ -12,14 +12,15 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-/// Entries that receive no lifecycle event for this long are considered stale.
-///
-/// A long TTL deliberately preserves a task that is waiting for the user over a
-/// weekend. PID validation removes abandoned entries earlier when Codex exposes
-/// a host PID to the hook.
+/// Waiting entries that receive no lifecycle event for this long are stale.
+/// A long TTL deliberately preserves a task that is waiting over a weekend.
 pub const DEFAULT_ACTIVITY_TTL: Duration = Duration::from_secs(7 * 24 * 60 * 60);
 
-const STATE_VERSION: u32 = 1;
+/// Executing turns need a shorter fallback because Codex does not guarantee a
+/// Stop hook when a turn is interrupted or its worker is terminated.
+const EXECUTING_ACTIVITY_TTL: Duration = Duration::from_secs(5 * 60);
+
+const STATE_VERSION: u32 = 2;
 const LOCK_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -227,13 +228,24 @@ fn upsert_from_input(
         return false;
     };
     let turn_hash = hash_identifier(turn_id);
-    let host_pid = input
+    let explicit_host_pid = input
         .host_pid
         .or_else(|| env_u32("CODEX_HOST_PID"))
         .or_else(|| env_u32("CODEX_PARENT_PID"));
-    let host_started_at_ms = input
+    let explicit_host_started_at_ms = input
         .host_started_at_ms
         .or_else(|| env_u64("CODEX_HOST_STARTED_AT_MS"));
+    let discovered_host = discover_codex_host();
+    let host_pid = explicit_host_pid.or(discovered_host.map(|host| host.0));
+    let host_started_at_ms = explicit_host_started_at_ms.or_else(|| {
+        discovered_host.and_then(|host| (Some(host.0) == host_pid).then_some(host.1).flatten())
+    });
+
+    // A Codex session can execute only one turn at a time. If Stop was skipped,
+    // the next turn is authoritative and replaces the residual turn.
+    state
+        .entries
+        .retain(|entry| entry.session_hash != session_hash || entry.turn_hash == turn_hash);
     if let Some(entry) = state
         .entries
         .iter_mut()
@@ -298,16 +310,27 @@ fn summarize(state: &ActivityState, observed_at_ms: u64) -> ActivitySummary {
 }
 
 fn prune_stale_entries(state: &mut ActivityState, now: u64, ttl: Duration) -> bool {
-    let ttl_ms = ttl.as_millis().min(u128::from(u64::MAX)) as u64;
+    let waiting_ttl_ms = duration_ms(ttl);
+    let executing_ttl_ms = duration_ms(ttl.min(EXECUTING_ACTIVITY_TTL));
     let before = state.entries.len();
     state.entries.retain(|entry| {
-        let within_ttl = now.saturating_sub(entry.updated_at_ms) <= ttl_ms;
+        let entry_ttl_ms = match entry.status {
+            ActivityStatus::Executing => executing_ttl_ms,
+            ActivityStatus::WaitingOnApproval | ActivityStatus::WaitingOnUserInput => {
+                waiting_ttl_ms
+            }
+        };
+        let within_ttl = now.saturating_sub(entry.updated_at_ms) <= entry_ttl_ms;
         let host_is_alive = entry
             .host_pid
             .map_or(true, |pid| process_matches(pid, entry.host_started_at_ms));
         within_ttl && host_is_alive
     });
     state.entries.len() != before
+}
+
+fn duration_ms(duration: Duration) -> u64 {
+    duration.as_millis().min(u128::from(u64::MAX)) as u64
 }
 
 fn load_state(path: &Path) -> (ActivityState, bool) {
@@ -321,6 +344,11 @@ fn load_state(path: &Path) -> (ActivityState, bool) {
     match serde_json::from_reader::<_, ActivityState>(BufReader::new(file)) {
         Ok(mut state) => {
             let needs_repair = state.version != STATE_VERSION;
+            if state.version < 2 {
+                // V1 usually had no host identity, so those entries cannot be
+                // distinguished from turns abandoned before this upgrade.
+                state.entries.retain(|entry| entry.host_pid.is_some());
+            }
             state.version = STATE_VERSION;
             (state, needs_repair)
         }
@@ -530,9 +558,94 @@ fn sha256(input: &[u8]) -> [u8; 32] {
 }
 
 #[cfg(windows)]
-fn process_matches(pid: u32, expected_started_at_ms: Option<u64>) -> bool {
+fn discover_codex_host() -> Option<(u32, Option<u64>)> {
+    use std::mem::{size_of, zeroed};
+
+    const TH32CS_SNAPPROCESS: u32 = 0x2;
+    const INVALID_HANDLE_VALUE: *mut std::ffi::c_void = -1_isize as *mut _;
+    let snapshot = unsafe { windows_api::CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
+    if snapshot == INVALID_HANDLE_VALUE {
+        return None;
+    }
+
+    let mut processes = Vec::new();
+    let mut entry: windows_api::ProcessEntry32W = unsafe { zeroed() };
+    entry.size = size_of::<windows_api::ProcessEntry32W>() as u32;
+    let mut has_entry = unsafe { windows_api::Process32FirstW(snapshot, &mut entry) } != 0;
+    while has_entry {
+        let name_end = entry
+            .exe_file
+            .iter()
+            .position(|character| *character == 0)
+            .unwrap_or(entry.exe_file.len());
+        processes.push((
+            entry.process_id,
+            entry.parent_process_id,
+            String::from_utf16_lossy(&entry.exe_file[..name_end]),
+        ));
+        has_entry = unsafe { windows_api::Process32NextW(snapshot, &mut entry) } != 0;
+    }
+    unsafe { windows_api::CloseHandle(snapshot) };
+
+    let pid = find_codex_ancestor(std::process::id(), &processes)?;
+    Some((pid, process_started_at_ms(pid)))
+}
+
+#[cfg(not(windows))]
+fn discover_codex_host() -> Option<(u32, Option<u64>)> {
+    None
+}
+
+fn find_codex_ancestor(start_pid: u32, processes: &[(u32, u32, String)]) -> Option<u32> {
+    let mut current = start_pid;
+    for _ in 0..16 {
+        let (_, parent, _) = processes.iter().find(|process| process.0 == current)?;
+        let parent_process = processes.iter().find(|process| process.0 == *parent)?;
+        if parent_process.2.eq_ignore_ascii_case("codex.exe") {
+            return Some(parent_process.0);
+        }
+        if parent_process.0 == current || parent_process.0 == 0 {
+            return None;
+        }
+        current = parent_process.0;
+    }
+    None
+}
+
+#[cfg(windows)]
+fn process_started_at_ms(pid: u32) -> Option<u64> {
     use std::mem::MaybeUninit;
 
+    const PROCESS_QUERY_LIMITED_INFORMATION: u32 = 0x1000;
+    let handle = unsafe { windows_api::OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+    if handle.is_null() {
+        return None;
+    }
+    let mut created = MaybeUninit::<windows_api::FileTime>::uninit();
+    let mut exited = MaybeUninit::<windows_api::FileTime>::uninit();
+    let mut kernel = MaybeUninit::<windows_api::FileTime>::uninit();
+    let mut user = MaybeUninit::<windows_api::FileTime>::uninit();
+    let ok = unsafe {
+        windows_api::GetProcessTimes(
+            handle,
+            created.as_mut_ptr(),
+            exited.as_mut_ptr(),
+            kernel.as_mut_ptr(),
+            user.as_mut_ptr(),
+        )
+    };
+    unsafe { windows_api::CloseHandle(handle) };
+    if ok == 0 {
+        return None;
+    }
+    let created = unsafe { created.assume_init() };
+    let ticks = (u64::from(created.high) << 32) | u64::from(created.low);
+    const WINDOWS_TO_UNIX_EPOCH_MS: u64 = 11_644_473_600_000;
+    Some((ticks / 10_000).saturating_sub(WINDOWS_TO_UNIX_EPOCH_MS))
+}
+
+#[cfg(windows)]
+fn process_matches(pid: u32, expected_started_at_ms: Option<u64>) -> bool {
     const SYNCHRONIZE: u32 = 0x0010_0000;
     const PROCESS_QUERY_LIMITED_INFORMATION: u32 = 0x1000;
     const WAIT_TIMEOUT: u32 = 0x102;
@@ -549,27 +662,7 @@ fn process_matches(pid: u32, expected_started_at_ms: Option<u64>) -> bool {
     }
 
     let started_matches = expected_started_at_ms.map_or(true, |expected| {
-        let mut created = MaybeUninit::<windows_api::FileTime>::uninit();
-        let mut exited = MaybeUninit::<windows_api::FileTime>::uninit();
-        let mut kernel = MaybeUninit::<windows_api::FileTime>::uninit();
-        let mut user = MaybeUninit::<windows_api::FileTime>::uninit();
-        let ok = unsafe {
-            windows_api::GetProcessTimes(
-                handle,
-                created.as_mut_ptr(),
-                exited.as_mut_ptr(),
-                kernel.as_mut_ptr(),
-                user.as_mut_ptr(),
-            )
-        };
-        if ok == 0 {
-            return true;
-        }
-        let created = unsafe { created.assume_init() };
-        let ticks = (u64::from(created.high) << 32) | u64::from(created.low);
-        const WINDOWS_TO_UNIX_EPOCH_MS: u64 = 11_644_473_600_000;
-        let actual = (ticks / 10_000).saturating_sub(WINDOWS_TO_UNIX_EPOCH_MS);
-        actual.abs_diff(expected) <= 1_000
+        process_started_at_ms(pid).map_or(true, |actual| actual.abs_diff(expected) <= 1_000)
     });
     unsafe { windows_api::CloseHandle(handle) };
     started_matches
@@ -706,6 +799,20 @@ mod windows_api {
         pub high: u32,
     }
 
+    #[repr(C)]
+    pub struct ProcessEntry32W {
+        pub size: u32,
+        pub usage: u32,
+        pub process_id: u32,
+        pub default_heap_id: usize,
+        pub module_id: u32,
+        pub threads: u32,
+        pub parent_process_id: u32,
+        pub priority_class_base: i32,
+        pub flags: u32,
+        pub exe_file: [u16; 260],
+    }
+
     #[link(name = "kernel32")]
     extern "system" {
         pub fn CreateMutexW(
@@ -717,6 +824,9 @@ mod windows_api {
         pub fn ReleaseMutex(handle: *mut c_void) -> i32;
         pub fn CloseHandle(handle: *mut c_void) -> i32;
         pub fn MoveFileExW(existing: *const u16, new: *const u16, flags: u32) -> i32;
+        pub fn CreateToolhelp32Snapshot(flags: u32, process_id: u32) -> *mut c_void;
+        pub fn Process32FirstW(snapshot: *mut c_void, entry: *mut ProcessEntry32W) -> i32;
+        pub fn Process32NextW(snapshot: *mut c_void, entry: *mut ProcessEntry32W) -> i32;
         pub fn OpenProcess(access: u32, inherit_handle: i32, process_id: u32) -> *mut c_void;
         pub fn GetProcessTimes(
             process: *mut c_void,
@@ -860,6 +970,25 @@ mod tests {
     }
 
     #[test]
+    fn a_new_turn_replaces_a_residual_turn_in_the_same_session() {
+        let path = temp_activity("turn-replacement");
+        clean(&path);
+        for turn in ["t1", "t2"] {
+            hook(
+                &path,
+                &format!(
+                    r#"{{"session_id":"s1","turn_id":"{turn}","hook_event_name":"UserPromptSubmit"}}"#
+                ),
+            );
+        }
+        let state: ActivityState =
+            serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(state.entries.len(), 1);
+        assert_eq!(state.entries[0].turn_hash, hash_identifier("t2"));
+        clean(&path);
+    }
+
+    #[test]
     fn ttl_and_dead_pid_repair_abandoned_entries() {
         let path = temp_activity("repair");
         clean(&path);
@@ -890,6 +1019,75 @@ mod tests {
         let summary = read_activity_summary_at(&path, Duration::from_secs(1)).unwrap();
         assert_eq!(summary.total, 0);
         clean(&path);
+    }
+
+    #[test]
+    fn executing_entries_expire_before_waiting_entries() {
+        let now = now_ms();
+        let mut state = ActivityState {
+            version: STATE_VERSION,
+            updated_at_ms: now,
+            entries: vec![
+                ActivityEntry {
+                    session_hash: hash_identifier("executing"),
+                    turn_hash: hash_identifier("turn"),
+                    status: ActivityStatus::Executing,
+                    updated_at_ms: now.saturating_sub(duration_ms(EXECUTING_ACTIVITY_TTL) + 1),
+                    host_pid: None,
+                    host_started_at_ms: None,
+                },
+                ActivityEntry {
+                    session_hash: hash_identifier("waiting"),
+                    turn_hash: hash_identifier("turn"),
+                    status: ActivityStatus::WaitingOnUserInput,
+                    updated_at_ms: now.saturating_sub(duration_ms(EXECUTING_ACTIVITY_TTL) + 1),
+                    host_pid: None,
+                    host_started_at_ms: None,
+                },
+            ],
+        };
+        assert!(prune_stale_entries(&mut state, now, DEFAULT_ACTIVITY_TTL));
+        assert_eq!(state.entries.len(), 1);
+        assert_eq!(state.entries[0].status, ActivityStatus::WaitingOnUserInput);
+    }
+
+    #[test]
+    fn v1_entries_without_host_identity_are_removed_during_migration() {
+        let path = temp_activity("v1-migration");
+        clean(&path);
+        let now = now_ms();
+        let state = ActivityState {
+            version: 1,
+            updated_at_ms: now,
+            entries: vec![ActivityEntry {
+                session_hash: hash_identifier("legacy"),
+                turn_hash: hash_identifier("turn"),
+                status: ActivityStatus::Executing,
+                updated_at_ms: now,
+                host_pid: None,
+                host_started_at_ms: None,
+            }],
+        };
+        persist_state(&path, &state).unwrap();
+        let summary = read_activity_summary_at(&path, DEFAULT_ACTIVITY_TTL).unwrap();
+        assert_eq!(summary.total, 0);
+        let migrated: ActivityState =
+            serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(migrated.version, STATE_VERSION);
+        clean(&path);
+    }
+
+    #[test]
+    fn codex_ancestor_is_found_through_command_shells() {
+        let processes = vec![
+            (10, 20, "codex-quota-sync.exe".to_string()),
+            (20, 30, "cmd.exe".to_string()),
+            (30, 40, "powershell.exe".to_string()),
+            (40, 1, "Codex.exe".to_string()),
+            (1, 0, "explorer.exe".to_string()),
+        ];
+        assert_eq!(find_codex_ancestor(10, &processes), Some(40));
+        assert_eq!(find_codex_ancestor(1, &processes), None);
     }
 
     #[test]

@@ -236,3 +236,7 @@ Invoke-RestMethod 'http://nas.example.com:18080/v1/status'
 ### 活动数量始终为 0
 
 检查 `activity.json` 是否存在、Hook 是否在 `/hooks` 中被信任、Hook 命令的 exe 路径是否仍有效。等待输入统计是 best-effort，具体限制见 Hooks 文档。
+
+### 重启后执行中数量仍有残留
+
+新版会自动记录 Codex 宿主 PID：Codex 重启后，Collector 下一次读取会清理旧进程对应的状态；同一 session 的新 turn 也会替换旧 turn。无法通过生命周期事件清理的 `executing` 最长保留 5 分钟，而“待审批”和“待输入”仍按 7 天保留。首次从旧版升级时会一次性清理无法判断宿主是否存活的 V1 无 PID 条目。
