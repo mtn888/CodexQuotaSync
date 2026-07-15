@@ -323,12 +323,12 @@ viewer 不需要 secret，不需要 Codex 登录，也不安装活动 Hooks。
 ### 8.2 Android 小组件
 
 1. 安装 `android/app/build/outputs/apk/debug/app-debug.apk`；
-2. 长按桌面空白处，添加 **Codex Quota Sync** 小组件；
+2. 长按桌面空白处，选择 **Codex Quota Sync** 的 1×1、4×1 或 4×3 小组件；
 3. 输入 `http://quota.example.com:18080`；
 4. 保存并刷新；
 5. 关闭 Wi-Fi 再点右上角刷新，确认公网可用。
 
-Android 自动更新周期为 15 分钟，Doze 可能延迟。点击刷新可立即排队。
+Android 通过 WorkManager 每 15 分钟自动更新，网络失败会退避重试，系统每 30 分钟还有一次 AppWidget 备用触发。Doze 与澎湃 OS 后台策略仍可能延迟；请把应用电量策略设为“不限制”，并允许后台运行和自启动。点击刷新可立即排队。
 
 ## 9. HTTP 明文的明确边界
 

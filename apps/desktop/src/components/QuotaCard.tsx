@@ -1,5 +1,6 @@
 import { ArrowClockwise, ArrowDown, ArrowUp, ArrowsInSimple, ArrowsOutSimple, ClockCounterClockwise, CloudSlash, Info, PushPin, PushPinSlash, SignIn, WarningCircle } from "@phosphor-icons/react";
 import { memo, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { activityTone, pendingTaskCount } from "../lib/activityPresentation";
 import { clampPercent, formatDateTime, formatResetTime, quotaTier } from "../lib/format";
 import { copy, normalizeLanguage } from "../lib/i18n";
 import type { Language, ProviderSnapshot, WidgetPreferences } from "../types";
@@ -43,15 +44,15 @@ function localizedBackendMessage(message: string | null, language: Language): st
 
 function ActivityStrip({ snapshot, labels }: {
   snapshot: ProviderSnapshot;
-  labels: { executing: string; approval: string; input: string; sync: string };
+  labels: { executing: string; pending: string; sync: string };
 }) {
+  const pending = pendingTaskCount(snapshot.activity);
   return (
     <section className={`activity-strip${snapshot.activity.stale ? " activity-strip--stale" : ""}`} aria-label={labels.sync}>
       <p className={`sync-caption sync-caption--${snapshot.sync.state}`} title={snapshot.sync.message ?? labels.sync}><i />{labels.sync}</p>
       <div className="activity-cells">
         <div className={`activity-cell activity-cell--running${snapshot.activity.executing > 0 ? " is-active" : ""}`} title={labels.executing}><strong>{snapshot.activity.executing}</strong><span>{labels.executing}</span></div>
-        <div className={`activity-cell activity-cell--approval${snapshot.activity.waitingOnApproval > 0 ? " is-active" : ""}`} title={labels.approval}><strong>{snapshot.activity.waitingOnApproval}</strong><span>{labels.approval}</span></div>
-        <div className={`activity-cell activity-cell--input${snapshot.activity.waitingOnUserInput > 0 ? " is-active" : ""}`} title={labels.input}><strong>{snapshot.activity.waitingOnUserInput}</strong><span>{labels.input}</span></div>
+        <div className={`activity-cell activity-cell--pending${pending > 0 ? " is-active" : ""}`} title={labels.pending}><strong>{pending}</strong><span>{labels.pending}</span></div>
       </div>
     </section>
   );
@@ -85,6 +86,7 @@ export const QuotaCard = memo(function QuotaCard({
   const staleExpired = snapshot.status === "stale" && staleAge > 30 * 60_000;
   const available = snapshot.status === "ok" || (snapshot.status === "stale" && !staleExpired);
   const tier = quotaTier(displayPercent);
+  const tone = activityTone(snapshot.activity);
   const activityRunning = snapshot.activity.executing > 0 || isConsuming;
   const indicatorState = activityRunning
     ? "active"
@@ -101,7 +103,7 @@ export const QuotaCard = memo(function QuotaCard({
 
   return (
     <main
-      className={`quota-card quota-card--${snapshot.status} quota-card--${tier}`}
+      className={`quota-card quota-card--${snapshot.status} quota-card--${tier} activity-tone--${tone}`}
       onMouseEnter={() => onHover(true)}
       onMouseLeave={() => onHover(false)}
       onMouseDown={(event) => { if (event.button === 0) void onDrag(); }}
@@ -157,7 +159,7 @@ export const QuotaCard = memo(function QuotaCard({
                 </div>
               ) : null}
             </div>
-            <ActivityStrip snapshot={snapshot} labels={{ executing: t.executingTasks, approval: t.waitingApproval, input: t.waitingInput, sync: t.syncState(snapshot.sync.state) }} />
+            <ActivityStrip snapshot={snapshot} labels={{ executing: t.executingTasks, pending: t.pendingTasks, sync: t.syncState(snapshot.sync.state) }} />
           </footer>
         </>
       ) : (
@@ -171,7 +173,7 @@ export const QuotaCard = memo(function QuotaCard({
               <span>{t.refresh}</span>
             </button>
           ) : null}
-          <div className="error-activity"><ActivityStrip snapshot={snapshot} labels={{ executing: t.executingTasks, approval: t.waitingApproval, input: t.waitingInput, sync: t.syncState(snapshot.sync.state) }} /></div>
+          <div className="error-activity"><ActivityStrip snapshot={snapshot} labels={{ executing: t.executingTasks, pending: t.pendingTasks, sync: t.syncState(snapshot.sync.state) }} /></div>
         </section>
       )}
     </main>
@@ -191,7 +193,8 @@ export const QuotaOrb = memo(function QuotaOrb({ snapshot, onDrag, onHover, lang
   const staleAge = Date.now() - new Date(snapshot.updatedAt).getTime();
   const available = (snapshot.status === "ok" || (snapshot.status === "stale" && staleAge <= 30 * 60_000)) && displayPercent !== null;
   const actionRequired = snapshot.activity.waitingOnApproval + snapshot.activity.waitingOnUserInput;
-  const taskLabel = `${t.executingTasks} ${snapshot.activity.executing}，${t.waitingApproval} ${snapshot.activity.waitingOnApproval}，${t.waitingInput} ${snapshot.activity.waitingOnUserInput}`;
+  const tone = activityTone(snapshot.activity);
+  const taskLabel = `${t.executingTasks} ${snapshot.activity.executing}，${t.pendingTasks} ${actionRequired}`;
 
   useEffect(() => {
     idleTimer.current = window.setTimeout(() => setIdle(true), 2000);
@@ -208,14 +211,14 @@ export const QuotaOrb = memo(function QuotaOrb({ snapshot, onDrag, onHover, lang
 
   return (
     <main
-      className={`quota-orb quota-card--${snapshot.status} quota-card--${tier}${displayingWeeklyAsPrimary ? " quota-orb--weekly" : ""}${idle ? " quota-orb--idle" : ""}`}
+      className={`quota-orb quota-card--${snapshot.status} quota-card--${tier} activity-tone--${tone}${displayingWeeklyAsPrimary ? " quota-orb--weekly" : ""}${idle ? " quota-orb--idle" : ""}`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={() => onHover(false)}
       onMouseDown={(event) => { if (event.button === 0) void onDrag(); }}
       aria-label={`${available ? (displayingWeeklyAsPrimary ? t.weeklyAvailableLabel(displayPercent!) : t.availableLabel(displayPercent!)) : localizedBackendMessage(snapshot.message, activeLanguage) ?? t.unavailableStatus}；${taskLabel}`}
     >
       <div className="aurora" aria-hidden="true" />
-      {actionRequired > 0 ? <span className="orb-action-badge" title={`${t.waitingApproval} / ${t.waitingInput}`}>{actionRequired}</span> : null}
+      {actionRequired > 0 ? <span className="orb-action-badge" title={t.pendingTasks}>{actionRequired}</span> : null}
       {snapshot.activity.executing > 0 ? <span className="orb-running-dot" title={taskLabel} /> : null}
       {available && displayingWeeklyAsPrimary ? (
         <span className="orb-weekly-badge" aria-hidden="true">

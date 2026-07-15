@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:configure="com.mtn888.codexquotasync.ui.ConfigurationActivity"
+    android:description="@string/widget_description_compact"
+    android:initialLayout="@layout/widget_quota_compact"
+    android:minHeight="40dp"
+    android:minWidth="40dp"
+    android:previewLayout="@layout/widget_quota_compact"
+    android:resizeMode="none"
+    android:targetCellHeight="1"
+    android:targetCellWidth="1"
+    android:updatePeriodMillis="1800000"
+    android:widgetCategory="home_screen" />

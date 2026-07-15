@@ -32,7 +32,8 @@ class StatusFormatterTest {
                 Instant.parse("2026-07-15T12:00:00Z"),
             ),
         )
-        assertEquals("执行中 2   待审批 1   待输入 3", StatusFormatter.activity(activity))
+        assertEquals("执行中 2   待处理 4", StatusFormatter.activity(activity))
+        assertEquals(4, StatusFormatter.pending(activity))
     }
 
     @Test
@@ -72,8 +73,8 @@ class StatusFormatterTest {
             collectedAt = Instant.parse("2026-07-15T12:00:00Z"),
             activityStale = false,
         )
-        assertFalse(StatusFormatter.isStale(fresh, Instant.parse("2026-07-15T12:19:59Z")))
-        assertTrue(StatusFormatter.isStale(fresh, Instant.parse("2026-07-15T12:20:01Z")))
+        assertFalse(StatusFormatter.isStale(fresh, Instant.parse("2026-07-15T12:44:59Z")))
+        assertTrue(StatusFormatter.isStale(fresh, Instant.parse("2026-07-15T12:45:01Z")))
         assertTrue(StatusFormatter.isStale(payload(Instant.parse("2026-07-15T12:00:00Z"), true), Instant.parse("2026-07-15T12:01:00Z")))
     }
 

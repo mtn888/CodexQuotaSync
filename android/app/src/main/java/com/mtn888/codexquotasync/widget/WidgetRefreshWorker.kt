@@ -22,10 +22,10 @@ class WidgetRefreshWorker(
             Result.failure()
         } catch (error: Exception) {
             WidgetUpdater.showOffline(applicationContext, error.message ?: "同步失败")
-            // 周期任务会在下一轮（15 分钟）再次尝试；手动刷新失败后由用户决定是否重试。
-            // 返回 success 可避免网络故障时触发 WorkManager 默认的 10 分钟退避重试，
-            // 从而维持约定的低频轮询。
-            Result.success()
+            // Network and transient server failures must be retried. Treating
+            // them as success made an OEM-delayed periodic run wait another
+            // full scheduling window and left the widget offline indefinitely.
+            Result.retry()
         }
     }
 }

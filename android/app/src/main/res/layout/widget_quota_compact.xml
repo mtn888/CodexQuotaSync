@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root_compact"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background_idle">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/text_compact_window"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/window_short"
+            android:textColor="#CCFFFFFF"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/text_compact_quota"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:includeFontPadding="false"
+            android:text="@string/not_available"
+            android:textColor="@color/widget_text_primary"
+            android:textSize="25sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/compact_pending_badge"
+        android:layout_width="22dp"
+        android:layout_height="22dp"
+        android:layout_gravity="top|end"
+        android:background="@drawable/widget_cell_background"
+        android:gravity="center"
+        android:text="@string/zero"
+        android:textColor="@color/widget_text_primary"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/compact_running_dot"
+        android:layout_width="9dp"
+        android:layout_height="9dp"
+        android:layout_gravity="bottom|start"
+        android:background="@drawable/widget_running_dot"
+        android:visibility="gone" />
+</FrameLayout>

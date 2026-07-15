@@ -109,14 +109,13 @@ button { font: inherit; }
 .sync-caption--synced i, .sync-caption--local i { background: #28a765; }
 .sync-caption--offline i, .sync-caption--configuration i { background: #e2584d; }
 .sync-caption--stale i { background: #d48a15; }
-.activity-cells { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.activity-cells { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }
 .activity-cell { --signal: #788697; position: relative; height: 43px; display: grid; grid-template-rows: 23px 12px; place-items: center; overflow: hidden; border: 1px solid rgba(255,255,255,.44); border-radius: 10px; color: rgba(17,20,27,.58); background: rgba(255,255,255,.22); box-shadow: inset 0 1px 0 rgba(255,255,255,.32); }
 .activity-cell::before { content: ""; position: absolute; inset: 0 0 auto; height: 2px; background: var(--signal); opacity: .32; }
 .activity-cell strong { font-family: "Cascadia Mono", "Segoe UI Mono", monospace; font-size: 16px; font-weight: 650; line-height: 1; font-variant-numeric: tabular-nums; }
 .activity-cell span { max-width: 100%; overflow: hidden; font-size: 8px; font-weight: 650; letter-spacing: .015em; text-overflow: ellipsis; white-space: nowrap; }
 .activity-cell--running { --signal: #28a765; }
-.activity-cell--approval { --signal: #d48a15; }
-.activity-cell--input { --signal: #e2584d; }
+.activity-cell--pending { --signal: #d6a20f; }
 .activity-cell.is-active { color: #17191f; background: color-mix(in srgb, var(--signal) 13%, rgba(255,255,255,.56)); border-color: color-mix(in srgb, var(--signal) 34%, rgba(255,255,255,.5)); }
 .activity-cell.is-active::before { opacity: 1; box-shadow: 0 0 8px color-mix(in srgb, var(--signal) 58%, transparent); }
 .reset-credit-tip { position: absolute; left: 0; bottom: 25px; width: max-content; max-width: 190px; padding: 9px 11px; border: 1px solid rgba(255,255,255,.52); border-radius: 10px; color: #1f2935; background: rgba(255,255,255,.82); box-shadow: 0 12px 30px rgba(35,48,73,.14); backdrop-filter: blur(12px); font-size: 9px; font-weight: 500; line-height: 1.55; }
@@ -185,6 +184,15 @@ button { font: inherit; }
   -webkit-backdrop-filter: blur(18px) saturate(1.24);
   transition-duration: .5s;
 }
+.quota-card.activity-tone--idle,
+.quota-orb.activity-tone--idle { --cool: #aeb8c3; --glow: #e3e7ea; --warm: #c9cfd5; --linear-warm: #d7dce1; --linear-end: #eef1f3; --aurora-opacity: .42; }
+.quota-card.activity-tone--running,
+.quota-orb.activity-tone--running { --cool: #73b995; --glow: #ccebd8; --warm: #91d2aa; --linear-warm: #cfe4d7; --linear-end: #edf6f0; --aurora-opacity: .58; }
+.quota-card.activity-tone--pending,
+.quota-orb.activity-tone--pending { --cool: #d7b44d; --glow: #fff0a8; --warm: #edc85e; --linear-warm: #eadfb4; --linear-end: #fff8dc; --aurora-opacity: .62; }
+.quota-orb.activity-tone--idle.quota-orb--idle { background: rgba(223,227,231,.78); }
+.quota-orb.activity-tone--running.quota-orb--idle { background: rgba(201,231,213,.82); }
+.quota-orb.activity-tone--pending.quota-orb--idle { background: rgba(250,232,167,.84); }
 .quota-orb .aurora { inset: -55%; opacity: var(--aurora-opacity, .55); }
 .orb-weekly-badge { position: absolute; z-index: 2; top: 0; left: 50%; width: 52px; height: 20px; transform: translateX(-50%); color: #fff; }
 .orb-weekly-badge svg { position: absolute; inset: 0; width: 100%; height: 100%; filter: drop-shadow(0 1px 2px rgba(57,103,157,.12)); }
@@ -194,7 +202,7 @@ button { font: inherit; }
 .orb-metric small { margin: 0 0 3px 1px; font-size: 10px; font-weight: 750; letter-spacing: 0; }
 .orb-unavailable { width: 42px; height: 42px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.38); border-radius: 50%; color: rgba(17,20,27,.62); background: rgba(255,255,255,.16); backdrop-filter: blur(10px); }
 .orb-unavailable svg { width: 24px; height: 24px; }
-.orb-action-badge { position: absolute; z-index: 3; top: 6px; right: 6px; min-width: 18px; height: 18px; display: grid; place-items: center; padding: 0 5px; border: 1px solid rgba(255,255,255,.68); border-radius: 999px; color: white; background: #e2584d; box-shadow: 0 3px 10px rgba(190,65,58,.3); font: 700 10px/1 "Cascadia Mono", monospace; }
+.orb-action-badge { position: absolute; z-index: 3; top: 6px; right: 6px; min-width: 18px; height: 18px; display: grid; place-items: center; padding: 0 5px; border: 1px solid rgba(255,255,255,.72); border-radius: 999px; color: #3f3005; background: #f2c94c; box-shadow: 0 3px 10px rgba(154,116,16,.3); font: 700 10px/1 "Cascadia Mono", monospace; }
 .orb-running-dot { position: absolute; z-index: 3; left: 8px; bottom: 8px; width: 7px; height: 7px; border: 1px solid rgba(255,255,255,.72); border-radius: 50%; background: #28a765; box-shadow: 0 0 7px rgba(40,167,101,.72); }
 .quota-card--unavailable .orb-unavailable { color: #ff7653; }
 .quota-card--stale .orb-unavailable { color: #8f9094; }

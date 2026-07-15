@@ -5,7 +5,7 @@ import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
 
-class QuotaWidgetProvider : AppWidgetProvider() {
+open class BaseQuotaWidgetProvider : AppWidgetProvider() {
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
         WidgetScheduler.schedulePeriodic(context)
@@ -29,7 +29,9 @@ class QuotaWidgetProvider : AppWidgetProvider() {
     }
 
     override fun onDisabled(context: Context) {
-        WidgetScheduler.cancelPeriodic(context)
+        if (!WidgetUpdater.hasAnyWidgets(context)) {
+            WidgetScheduler.cancelPeriodic(context)
+        }
         super.onDisabled(context)
     }
 
@@ -37,3 +39,9 @@ class QuotaWidgetProvider : AppWidgetProvider() {
         const val ACTION_REFRESH = "com.mtn888.codexquotasync.action.REFRESH"
     }
 }
+
+class QuotaWidgetProvider : BaseQuotaWidgetProvider()
+
+class QuotaCompactWidgetProvider : BaseQuotaWidgetProvider()
+
+class QuotaWideWidgetProvider : BaseQuotaWidgetProvider()

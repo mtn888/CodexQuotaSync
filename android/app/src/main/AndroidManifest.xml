@@ -15,14 +15,18 @@
         android:usesCleartextTraffic="true">
 
         <activity
-            android:name=".ui.ConfigurationActivity"
-            android:exported="true"
-            android:label="@string/config_title">
+            android:name=".ui.MainActivity"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".ui.ConfigurationActivity"
+            android:exported="true"
+            android:label="@string/config_title" />
 
         <receiver
             android:name=".widget.QuotaWidgetProvider"
@@ -34,6 +38,30 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/quota_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.QuotaCompactWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.mtn888.codexquotasync.action.REFRESH" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/quota_widget_compact_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.QuotaWideWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.mtn888.codexquotasync.action.REFRESH" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/quota_widget_wide_info" />
         </receiver>
     </application>
 

@@ -9,7 +9,9 @@ import kotlin.math.roundToInt
 object StatusFormatter {
     private val resetTimeFormat = DateTimeFormatter.ofPattern("M月d日 HH:mm")
     private val updateTimeFormat = DateTimeFormatter.ofPattern("M月d日 HH:mm")
-    private val staleAfter: Duration = Duration.ofMinutes(20)
+    // WorkManager's 15-minute interval is a minimum, not a deadline. Leave
+    // enough room for Doze and OEM scheduling jitter before calling data stale.
+    private val staleAfter: Duration = Duration.ofMinutes(45)
 
     fun percentage(window: UsageWindow?): String =
         window?.let { "${it.remainingPercent.roundToInt()}%" } ?: "—"
@@ -41,7 +43,10 @@ object StatusFormatter {
     }
 
     fun activity(activity: ActivityStatus): String =
-        "执行中 ${activity.executing}   待审批 ${activity.waitingOnApproval}   待输入 ${activity.waitingOnUserInput}"
+        "执行中 ${activity.executing}   待处理 ${pending(activity)}"
+
+    fun pending(activity: ActivityStatus): Int =
+        activity.waitingOnApproval + activity.waitingOnUserInput
 
     fun updateTime(payload: StatusPayload, zoneId: ZoneId = ZoneId.systemDefault()): String =
         updateTimeFormat.withZone(zoneId).format(payload.collectedAt)

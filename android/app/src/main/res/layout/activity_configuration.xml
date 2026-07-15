@@ -79,7 +79,7 @@
             android:background="#FFE6EEEB"
             android:lineSpacingExtra="3dp"
             android:padding="16dp"
-            android:text="更新说明\n• 系统后台每 15 分钟尝试一次\n• 点击小组件右上角按钮可立即刷新\n• Android 省电策略可能延迟后台任务"
+            android:text="@string/configuration_notes"
             android:textColor="#FF52615B"
             android:textSize="14sp" />
     </LinearLayout>

@@ -31,6 +31,16 @@ class ConfigurationActivity : Activity() {
         }
 
         val repository = StatusRepository(this)
+        if (
+            appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID &&
+            repository.configuredBaseUrl() != null
+        ) {
+            WidgetScheduler.schedulePeriodic(this)
+            WidgetUpdater.showRefreshing(this, appWidgetId)
+            WidgetScheduler.enqueueImmediate(this)
+            finishSuccessfully()
+            return
+        }
         val input = findViewById<EditText>(R.id.input_base_url)
         val validation = findViewById<TextView>(R.id.text_validation_error)
         input.setText(repository.configuredBaseUrl().orEmpty())

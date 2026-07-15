@@ -8,6 +8,23 @@
     <string name="save_and_refresh">保存并刷新小组件</string>
     <string name="config_saved">配置已保存，正在刷新</string>
     <string name="widget_description">显示 Codex 额度、重置时间和任务状态</string>
+    <string name="widget_description_large">Codex 完整状态（4×3）</string>
+    <string name="widget_description_wide">Codex 额度与任务（4×1）</string>
+    <string name="widget_description_compact">Codex 额度悬浮球（1×1）</string>
     <string name="refresh">立即刷新</string>
     <string name="open_settings">打开设置</string>
+    <string name="status_loading">读取状态中…</string>
+    <string name="short_quota">5 小时额度</string>
+    <string name="weekly_quota">周额度</string>
+    <string name="quota">额度</string>
+    <string name="executing">执行中</string>
+    <string name="pending">待处理</string>
+    <string name="not_available">—</string>
+    <string name="zero">0</string>
+    <string name="next_reset_empty">下次重置：—</string>
+    <string name="no_cached_data">尚无缓存数据</string>
+    <string name="refresh_now">立即刷新</string>
+    <string name="server_settings">服务器设置</string>
+    <string name="window_short">5H</string>
+    <string name="configuration_notes">更新说明\n• 系统后台每 15 分钟尝试，失败会自动重试\n• 4×1 / 4×3 组件可直接点击刷新\n• 点击组件主体进入状态详情页\n• 澎湃 OS 请把电量策略设为“不限制”</string>
 </resources>

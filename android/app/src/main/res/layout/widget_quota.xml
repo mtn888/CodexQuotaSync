@@ -3,7 +3,7 @@
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_background"
+    android:background="@drawable/widget_background_idle"
     android:gravity="center_vertical"
     android:orientation="vertical">
 
@@ -139,7 +139,7 @@
         android:layout_marginTop="5dp"
         android:ellipsize="end"
         android:maxLines="1"
-        android:text="执行中 —   待审批 —   待输入 —"
+        android:text="执行中 —   待处理 —"
         android:textColor="@color/widget_text_primary"
         android:textSize="13sp"
         android:textStyle="bold" />
