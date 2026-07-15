@@ -26,5 +26,13 @@
     <string name="refresh_now">立即刷新</string>
     <string name="server_settings">服务器设置</string>
     <string name="window_short">5H</string>
-    <string name="configuration_notes">更新说明\n• 系统后台每 15 分钟尝试，失败会自动重试\n• 4×1 / 4×3 组件可直接点击刷新\n• 点击组件主体进入状态详情页\n• 澎湃 OS 请把电量策略设为“不限制”</string>
+    <string name="configuration_notes">更新说明\n• 系统后台每 15 分钟尝试，失败会自动重试\n• 任务完成或待处理增加时发送通知\n• 点击组件主体进入状态详情页\n• 澎湃 OS 请允许通知、自启动并把电量策略设为“不限制”</string>
+    <string name="notification_channel_name">Codex 任务状态提醒</string>
+    <string name="notification_channel_description">任务完成或出现新的待处理事项时提醒</string>
+    <string name="notification_title_completed">Codex 任务已完成</string>
+    <string name="notification_title_pending">Codex 有新的待处理</string>
+    <string name="notification_title_combined">Codex 任务状态有更新</string>
+    <string name="notification_message_completed">执行中从 %1$d 降至 %2$d</string>
+    <string name="notification_message_pending">待处理从 %1$d 增至 %2$d，请打开查看</string>
+    <string name="notification_message_combined">完成 %1$d 个任务，新增 %2$d 项待处理；当前执行中 %3$d，待处理 %4$d</string>
 </resources>

@@ -15,11 +15,17 @@ class StatusRepository(private val context: Context) {
 
     fun saveBaseUrl(input: String): String {
         val normalized = normalizeBaseUrl(input)
+        val previous = configuredBaseUrl()
         configPreferences.edit().putString(KEY_BASE_URL, normalized).apply()
+        if (previous != normalized) {
+            synchronized(CACHE_LOCK) {
+                cachePreferences.edit().clear().commit()
+            }
+        }
         return normalized
     }
 
-    fun fetch(): StatusPayload {
+    fun fetch(): SuccessfulFetch {
         val baseUrl = configuredBaseUrl() ?: throw ConfigurationException("尚未配置服务器地址")
         val endpoint = endpointFor(baseUrl)
         val connection = (URL(endpoint).openConnection() as? HttpURLConnection)
@@ -40,17 +46,25 @@ class StatusRepository(private val context: Context) {
 
             val json = connection.inputStream.use(::readLimitedUtf8)
             val parsed = StatusParser.parse(json)
-            cachePreferences.edit()
-                .putString(KEY_LAST_JSON, json)
-                .putLong(KEY_LAST_SUCCESS_AT, System.currentTimeMillis())
-                .apply()
-            return parsed
+            return synchronized(CACHE_LOCK) {
+                val previous = loadCachedLocked()?.payload
+                val saved = cachePreferences.edit()
+                    .putString(KEY_LAST_JSON, json)
+                    .putLong(KEY_LAST_SUCCESS_AT, System.currentTimeMillis())
+                    .commit()
+                if (!saved) throw IOException("无法保存最近一次同步结果")
+                SuccessfulFetch(previous = previous, current = parsed)
+            }
         } finally {
             connection.disconnect()
         }
     }
 
     fun loadCached(): CachedStatus? {
+        return synchronized(CACHE_LOCK) { loadCachedLocked() }
+    }
+
+    private fun loadCachedLocked(): CachedStatus? {
         val json = cachePreferences.getString(KEY_LAST_JSON, null) ?: return null
         return try {
             CachedStatus(
@@ -72,6 +86,7 @@ class StatusRepository(private val context: Context) {
         private const val CONNECT_TIMEOUT_MILLIS = 10_000
         private const val READ_TIMEOUT_MILLIS = 10_000
         private const val MAX_RESPONSE_CHARS = 512 * 1024
+        private val CACHE_LOCK = Any()
 
         fun normalizeBaseUrl(input: String): String {
             val trimmed = input.trim().trimEnd('/')
@@ -116,5 +131,7 @@ class StatusRepository(private val context: Context) {
 }
 
 data class CachedStatus(val payload: StatusPayload, val fetchedAt: Instant)
+
+data class SuccessfulFetch(val previous: StatusPayload?, val current: StatusPayload)
 
 class ConfigurationException(message: String, cause: Throwable? = null) : Exception(message, cause)

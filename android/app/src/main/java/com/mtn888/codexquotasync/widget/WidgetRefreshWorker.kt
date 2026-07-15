@@ -4,7 +4,9 @@ import android.content.Context
 import androidx.work.Worker
 import androidx.work.WorkerParameters
 import com.mtn888.codexquotasync.data.ConfigurationException
+import com.mtn888.codexquotasync.data.ActivityTransitionDetector
 import com.mtn888.codexquotasync.data.StatusRepository
+import com.mtn888.codexquotasync.notification.ActivityNotifier
 
 class WidgetRefreshWorker(
     appContext: Context,
@@ -14,8 +16,11 @@ class WidgetRefreshWorker(
     override fun doWork(): Result {
         val repository = StatusRepository(applicationContext)
         return try {
-            val payload = repository.fetch()
-            WidgetUpdater.showOnline(applicationContext, payload)
+            val fetch = repository.fetch()
+            WidgetUpdater.showOnline(applicationContext, fetch.current)
+            ActivityTransitionDetector.detect(fetch.previous, fetch.current)?.let {
+                ActivityNotifier.notify(applicationContext, it)
+            }
             Result.success()
         } catch (error: ConfigurationException) {
             WidgetUpdater.showInitial(applicationContext)

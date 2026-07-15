@@ -1,16 +1,21 @@
 package com.mtn888.codexquotasync.ui
 
+import android.Manifest
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import com.mtn888.codexquotasync.R
+import com.mtn888.codexquotasync.data.ActivityTransitionDetector
 import com.mtn888.codexquotasync.data.StatusFormatter
 import com.mtn888.codexquotasync.data.StatusPayload
 import com.mtn888.codexquotasync.data.StatusRepository
+import com.mtn888.codexquotasync.notification.ActivityNotifier
 import com.mtn888.codexquotasync.widget.WidgetScheduler
 import com.mtn888.codexquotasync.widget.WidgetUpdater
 import java.util.Locale
@@ -26,6 +31,8 @@ class MainActivity : Activity() {
         repository = StatusRepository(this)
         refreshButton = findViewById(R.id.button_detail_refresh)
         progress = findViewById(R.id.refresh_progress)
+        ActivityNotifier.ensureChannel(this)
+        requestNotificationPermissionIfNeeded()
         refreshButton.setOnClickListener { refreshNow() }
         findViewById<Button>(R.id.button_open_settings).setOnClickListener {
             startActivity(Intent(this, ConfigurationActivity::class.java))
@@ -55,8 +62,12 @@ class MainActivity : Activity() {
         setRefreshing(true)
         Thread {
             try {
-                val payload = repository.fetch()
+                val fetch = repository.fetch()
+                val payload = fetch.current
                 WidgetUpdater.showOnline(applicationContext, payload)
+                ActivityTransitionDetector.detect(fetch.previous, payload)?.let {
+                    ActivityNotifier.notify(applicationContext, it)
+                }
                 runOnUiThread {
                     render(payload)
                     setRefreshing(false)
@@ -76,6 +87,18 @@ class MainActivity : Activity() {
         refreshButton.isEnabled = !refreshing
         refreshButton.text = if (refreshing) "刷新中…" else "立即刷新"
         progress.visibility = if (refreshing) View.VISIBLE else View.GONE
+    }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(
+                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                REQUEST_NOTIFICATION_PERMISSION,
+            )
+        }
     }
 
     private fun render(payload: StatusPayload?, error: String? = null) {
@@ -109,4 +132,8 @@ class MainActivity : Activity() {
     }
 
     private fun text(id: Int): TextView = findViewById(id)
+
+    companion object {
+        private const val REQUEST_NOTIFICATION_PERMISSION = 4301
+    }
 }
