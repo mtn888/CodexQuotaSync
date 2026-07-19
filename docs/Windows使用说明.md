@@ -77,14 +77,15 @@ cargo build
 
 ## 3. collector 配置
 
-主 Windows 电脑是唯一 collector。先从仓库的 `apps\desktop` 目录执行：
+主 Windows 电脑是唯一 collector。初次配置可以直接使用[图形设置页面](#6-图形设置页面)，也可以从仓库的 `apps\desktop` 目录执行以下 PowerShell 命令；后者适合自动化或批量部署：
 
 ```powershell
 .\scripts\configure-sync.ps1 `
   -Role collector `
   -ServerUrl 'http://nas.example.com:18080' `
   -WriteSecret '与 UnRaid CQS_WRITE_SECRET 完全相同的值' `
-  -SourceId 'windows-main'
+  -SourceId 'windows-main' `
+  -ShutdownScriptPath 'E:\python\shutdown.cmd'
 ```
 
 如果暂时只想在本机使用悬浮框、不上传服务器：
@@ -107,7 +108,8 @@ collector 的行为：
 - 常规最多每 5 分钟请求一次用量；临近重置时每分钟；
 - 每分钟读取一次活动聚合并上传；
 - 如果服务器离线，本地额度仍正常显示，右下角同步状态标为“服务器离线”；
-- 写密钥不会传给前端 WebView，也不会上传到其他设备。
+- 写入密钥只保存在本机配置中，不会进入同步 JSON 或其他设备；设置页中的密钥输入为仅写字段，已保存的值不会回显。
+- 完成后关机脚本默认是 `E:\python\shutdown.cmd`；可通过 `-ShutdownScriptPath` 改为本机其他绝对 `.cmd` 或 `.bat` 路径。保存路径时不会执行脚本，开启完成后关机开关时才会检查该文件是否存在且可访问。
 
 ## 4. 安装 Codex 活动 Hooks
 
@@ -161,30 +163,53 @@ $exe = (Resolve-Path '.\src-tauri\target\release\codex-quota-sync.exe').Path
 
 viewer 每分钟读取 `/v1/status`。连接失败时继续显示进程内最后一份远端快照并标为离线；`collectedAt` 超过 15 分钟后标为过期。重启 viewer 且服务器仍离线时，因为桌面端不把远端 JSON 持久化到磁盘，会显示不可用，直到服务器恢复。
 
-## 6. 悬浮框操作
+## 6. 图形设置页面
+
+Collector 和 viewer 都可以使用图形设置页面，不必为了修改服务器地址或端口重新执行 PowerShell。可从以下任一位置打开：
+
+- 展开悬浮卡右上角的齿轮；
+- 托盘菜单的“设置”。即使悬浮窗锁定或折叠，仍可从这里打开。
+
+设置页可配置设备角色、服务器地址、服务器端口、设备标识、Hooks 状态文件位置和完成后关机脚本。地址与端口会保存为同一个 `serverUrl`，例如输入 `http://10.10.10.254` 与 `18080` 后，实际连接地址为 `http://10.10.10.254:18080`。填写的是 HTTP 服务根地址，不要填 `/v1/status`、路径、查询参数、用户名或密码；端口单独填写。Hooks 状态文件位置只对 collector 的本地活动读取生效。
+
+当前表单角色为 collector 时，设置页会显示“Collector 写入密钥”密码输入框。这是仅写字段：打开设置页和保存后始终为空，已保存的密钥不会通过配置读取、设置事件或同步 JSON 返回界面。填写非空值并保存会在本机创建或替换写入密钥；留空保存则保留当前密钥。Viewer 不显示该输入框，保存为 viewer 时会清除本机已保存的写入密钥。
+
+文本配置仅在点击“保存设置”后写入。保存时若修改设备角色、Hooks 状态文件或关机脚本，应用会自动取消已武装的“完成后关机”；随后需要重新武装。仅修改服务器地址/端口或设备标识不会取消该开关，但会清理旧快照缓存并刷新悬浮组件。
+
+### 完成后关机
+
+Collector 展开卡右上角的电源按钮和设置页中的“完成后关机”开关是同一个一次性武装操作：
+
+1. 必须先在同一运行期得到一份可信 Hooks 快照显示“执行中”大于 0；如果开启时已经有这份新鲜快照，也可以直接作为基线；
+2. 后续可信 Hooks 快照显示“执行中”变为 0 时，会按同步配置先尝试上传最终状态，再启动配置的 `.cmd` 或 `.bat` 脚本；
+3. 开关自动关闭。程序重启、保存为 viewer，或保存时更换设备角色、Hooks 状态文件、关机脚本，都会关闭开关；Hooks 状态过期或不可用不会触发关机，并会清除旧的执行中基线，恢复后需要重新观察到执行中任务。
+
+因此，不会因为程序刚启动时显示 0 或数据过期而误关机。服务器离线不会取消已经武装的本地动作：最终状态上传可能失败，但只要本地 Hooks 可信地确认任务完成，脚本仍会执行。Viewer 也能编辑并保存脚本路径，便于日后切换角色，但不能武装或执行关机。
+
+## 7. 悬浮框操作
 
 - 默认是 80×80 悬浮球，显示当前主要额度；
 - 鼠标移入展开为 320×320 卡片；
-- 右上角图标可保持展开或切换始终置顶；
+- 右上角图标可保持展开、切换始终置顶、一次性武装“完成后关机”或打开设置；
 - 右下两格依次为执行中、待处理；待处理是“待审批 + 待输入”的总数；
 - 执行中和待处理都为 0 时背景为灰色；仅有执行中时为绿色；待处理大于 0 时黄色优先；
 - 悬浮球右上黄色角标显示待处理数量；左下绿点表示仍有执行中任务；
-- 托盘菜单可显示/隐藏、立即刷新、解锁鼠标穿透、切换中英文、开机启动或退出；
+- 托盘菜单可显示/隐藏、立即刷新、打开设置、解锁鼠标穿透、切换中英文、开机启动或退出；
 - 拖到屏幕边缘后会吸附，展开时自动避开工作区边界和任务栏。
 
-## 7. 手工检查配置
+## 8. 手工检查配置
 
 只检查非敏感字段：
 
 ```powershell
 $path = Join-Path $env:APPDATA 'io.github.mtn888.codexquotasync\preferences.json'
 $config = Get-Content -Raw -LiteralPath $path | ConvertFrom-Json
-$config | Select-Object syncRole,serverUrl,sourceId,activityStatePath
+$config | Select-Object syncRole,serverUrl,sourceId,activityStatePath,shutdownScriptPath
 ```
 
 不要把整个配置文件贴到 issue、聊天或截图中，因为 collector 文件含 `writeSecret`。
 
-## 8. 更新与回滚
+## 9. 更新与回滚
 
 更新桌面程序前：
 
@@ -198,7 +223,7 @@ $config | Select-Object syncRole,serverUrl,sourceId,activityStatePath
 
 项目已移除 Quota Float 上游自动更新器、公钥和 release endpoint，避免从另一个仓库自动安装不兼容版本。当前更新通过本仓库构建或未来的 `mtn888/CodexQuotaSync` 发布包进行。
 
-## 9. 卸载
+## 10. 卸载
 
 先删除 Hooks：
 
@@ -215,7 +240,7 @@ $config | Select-Object syncRole,serverUrl,sourceId,activityStatePath
 
 卸载脚本不会自动删除活动文件，以免误删仍在使用的数据。
 
-## 10. 常见问题
+## 11. 常见问题
 
 ### collector 显示“请先登录 Codex”
 
@@ -223,7 +248,7 @@ $config | Select-Object syncRole,serverUrl,sourceId,activityStatePath
 
 ### 显示“同步未配置”
 
-重新运行配置脚本，确认 URL 以 `http://` 开头。collector 使用服务器时还必须提供 secret。
+在设置页或配置脚本中确认 URL 以 `http://` 开头。collector 使用服务器时还必须保存与服务器一致的写入密钥；设置页的“Collector 写入密钥”字段留空不会替换已有密钥。
 
 ### 显示“服务器离线”
 
@@ -241,3 +266,7 @@ Invoke-RestMethod 'http://nas.example.com:18080/v1/status'
 ### 重启后执行中数量仍有残留
 
 新版会自动记录 Codex 宿主 PID：Codex 重启后，Collector 下一次读取会清理旧进程对应的状态；同一 session 的新 turn 也会替换旧 turn。无法通过生命周期事件清理的 `executing` 最长保留 5 分钟，而“待审批”和“待输入”仍按 7 天保留。首次从旧版升级时会一次性清理无法判断宿主是否存活的 V1 无 PID 条目。
+
+### 完成后关机开关无法开启
+
+该功能只在 collector 生效。确认设置页中“关机脚本路径”是当前电脑存在的绝对 `.cmd` 或 `.bat` 文件；默认路径是 `E:\python\shutdown.cmd`。开关是一次性的，重启应用后会自动关闭。

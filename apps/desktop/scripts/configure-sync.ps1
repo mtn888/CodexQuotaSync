@@ -18,6 +18,9 @@ param(
     [string]$ActivityStatePath = '',
 
     [Parameter(Mandatory = $false)]
+    [string]$ShutdownScriptPath = '',
+
+    [Parameter(Mandatory = $false)]
     [string]$ConfigPath
 )
 
@@ -57,6 +60,7 @@ $defaults = [ordered]@{
     sourceId          = 'windows-main'
     writeSecret       = ''
     activityStatePath = ''
+    shutdownScriptPath = 'E:\python\shutdown.cmd'
 }
 
 if (Test-Path -LiteralPath $ConfigPath -PathType Leaf) {
@@ -75,6 +79,9 @@ $defaults.syncRole = $Role
 $defaults.serverUrl = $ServerUrl
 $defaults.sourceId = $SourceId
 $defaults.activityStatePath = $ActivityStatePath.Trim()
+if ($PSBoundParameters.ContainsKey('ShutdownScriptPath')) {
+    $defaults.shutdownScriptPath = $ShutdownScriptPath.Trim()
+}
 if ($Role -eq 'collector') {
     if (-not [string]::IsNullOrEmpty($WriteSecret)) {
         $defaults.writeSecret = $WriteSecret

@@ -232,7 +232,7 @@ ss -lnt | grep 18080
 
 ## 6. 配置主 Windows collector
 
-在仓库 `apps\desktop` 目录：
+可任选图形设置或 PowerShell 配置。图形设置方式：启动 Codex Quota Sync 后，从展开卡片齿轮或托盘“设置”打开设置页，选择 collector，填写 HTTP 服务地址、端口、设备标识和“Collector 写入密钥”，然后保存；密钥为仅写字段，保存后不会显示。需要自动化或批量部署时，在仓库 `apps\desktop` 目录执行：
 
 ```powershell
 .\scripts\configure-sync.ps1 `
@@ -297,7 +297,7 @@ http://quota.example.com:18080/healthz
 
 ### 7.5 切换 collector 到公网域名
 
-外网验证后可把 collector URL 也改为域名，或主电脑继续使用局域网地址：
+外网验证后可把 collector URL 也改为域名，或主电脑继续使用局域网地址。可在设置页直接修改服务器地址和端口并保存；collector 的写入密钥字段留空会保留原值。也可以使用 PowerShell：
 
 ```powershell
 .\scripts\configure-sync.ps1 `
@@ -440,7 +440,7 @@ curl -fsS http://127.0.0.1:18080/healthz
 
 1. 生成新 secret；
 2. 更新 UnRaid `.env`；
-3. 在 collector 运行 `configure-sync.ps1` 写入同一新值；
+3. 在 collector 设置页的“Collector 写入密钥”字段填写同一新值并保存，或运行 `configure-sync.ps1` 写入该值；
 4. `docker compose up -d --force-recreate`；
 5. 重启 collector 并立即刷新；
 6. viewer/Android 不需要修改。

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { QuotaCard, QuotaOrb } from "./components/QuotaCard";
-import { fetchSnapshots, getPreferences, listenDesktopEvents, setAlwaysOnTop, setWidgetExpanded, startDragging, updatePreferences } from "./lib/bridge";
+import { fetchSnapshots, getCompletionShutdownState, getPreferences, listenDesktopEvents, openSettings, setAlwaysOnTop, setCompletionShutdownArmed as updateCompletionShutdownArmed, setWidgetExpanded, startDragging, updatePreferences } from "./lib/bridge";
 import { copy, normalizeLanguage } from "./lib/i18n";
 import { mergeSnapshots } from "./lib/snapshots";
 import type { ProviderSnapshot, WidgetPreferences } from "./types";
@@ -16,6 +16,7 @@ const DEFAULT_PREFS: WidgetPreferences = {
   serverUrl: "",
   sourceId: "windows-main",
   activityStatePath: "",
+  shutdownScriptPath: "E:\\python\\shutdown.cmd",
 };
 
 export default function App() {
@@ -26,6 +27,7 @@ export default function App() {
   const [compact, setCompact] = useState(true);
   const [consumingProviders, setConsumingProviders] = useState<Set<string>>(() => new Set());
   const [operationError, setOperationError] = useState<string | null>(null);
+  const [completionShutdownArmed, setCompletionShutdownArmed] = useState(false);
   const failures = useRef(0);
   const previousPrimary = useRef(new Map<string, number>());
   const consumptionTimers = useRef(new Map<string, number>());
@@ -77,11 +79,14 @@ export default function App() {
           sync: { role: preferences.syncRole, state: "offline", sourceId: preferences.sourceId, collectedAt: null, receivedAt: null, message: "Refresh failed." },
         }]);
     }
-  }, [preferences.sourceId, preferences.syncRole]);
+  // 同步端点或 Hooks 状态文件变更后，重新创建刷新回调会触发现有的强制刷新 effect，
+  // 使设置页保存立即生效，而不是等待下一次定时刷新。
+  }, [preferences.activityStatePath, preferences.serverUrl, preferences.sourceId, preferences.syncRole]);
 
   useEffect(() => {
     void refresh(true);
     void getPreferences().then((value) => setPreferences({ ...DEFAULT_PREFS, ...value, language: normalizeLanguage(value.language) })).catch(() => setOperationError("Unable to read settings. Defaults are in use."));
+    void getCompletionShutdownState().then((value) => setCompletionShutdownArmed(value.armed)).catch(() => setOperationError("Unable to read completion shutdown state."));
     return () => {
       for (const timer of consumptionTimers.current.values()) window.clearTimeout(timer);
       consumptionTimers.current.clear();
@@ -92,7 +97,12 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
     let cleanup: () => void = () => {};
-    void listenDesktopEvents({ onPreferences: (value) => setPreferences({ ...DEFAULT_PREFS, ...value, language: normalizeLanguage(value.language) }), onRefresh: () => void refresh(true) }).then((value) => {
+    void listenDesktopEvents({
+      onPreferences: (value) => setPreferences({ ...DEFAULT_PREFS, ...value, language: normalizeLanguage(value.language) }),
+      onRefresh: () => void refresh(true),
+      onCompletionShutdown: (value) => setCompletionShutdownArmed(value.armed),
+      onCompletionShutdownNotice: (message) => setOperationError(message),
+    }).then((value) => {
       if (cancelled) value(); else cleanup = value;
     }).catch(() => setOperationError("Desktop event listener failed to start."));
     return () => { cancelled = true; cleanup(); };
@@ -133,6 +143,21 @@ export default function App() {
     setOperationError(null);
     void updatePreferences(next).catch(() => { setPreferences(previous); setOperationError("Settings could not be saved. Previous state restored."); });
   }, [preferences]);
+
+  const toggleCompletionShutdown = useCallback(() => {
+    setOperationError(null);
+    void updateCompletionShutdownArmed(!completionShutdownArmed)
+      .then((value) => {
+        setCompletionShutdownArmed(value.armed);
+        if (value.armed) void refresh(true);
+      })
+      .catch((reason: unknown) => setOperationError(reason instanceof Error ? reason.message : "Unable to update completion shutdown."));
+  }, [completionShutdownArmed, refresh]);
+
+  const handleOpenSettings = useCallback(() => {
+    setOperationError(null);
+    void openSettings().catch((reason: unknown) => setOperationError(reason instanceof Error ? reason.message : "Unable to open settings."));
+  }, []);
 
   const handleHover = useCallback((value: boolean) => {
     if (collapseTimer.current !== null) {
@@ -186,6 +211,9 @@ export default function App() {
       onDrag={() => startDragging()}
       onHover={handleHover}
       onRefresh={() => refresh(true)}
+      completionShutdownArmed={completionShutdownArmed}
+      onToggleCompletionShutdown={toggleCompletionShutdown}
+      onOpenSettings={handleOpenSettings}
       isConsuming={consumingProviders.has(current.provider)}
       notice={operationError}
     />

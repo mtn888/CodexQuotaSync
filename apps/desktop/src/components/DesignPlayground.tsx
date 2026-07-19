@@ -18,7 +18,7 @@ const preview: ProviderSnapshot = {
   activity: { executing: 2, waitingOnApproval: 1, waitingOnUserInput: 0, source: "hooks", observedAt: new Date().toISOString(), stale: false },
   sync: { role: "collector", state: "synced", sourceId: "windows-main", collectedAt: new Date().toISOString(), receivedAt: new Date().toISOString(), message: null },
 };
-const preferences: WidgetPreferences = { locked: false, alwaysOnTop: true, stayExpanded: false, pinnedProvider: "codex", autoRotateSeconds: 12, language: "en", syncRole: "collector", serverUrl: "", sourceId: "windows-main", activityStatePath: "" };
+const preferences: WidgetPreferences = { locked: false, alwaysOnTop: true, stayExpanded: false, pinnedProvider: "codex", autoRotateSeconds: 12, language: "en", syncRole: "collector", serverUrl: "", sourceId: "windows-main", activityStatePath: "", shutdownScriptPath: "E:\\python\\shutdown.cmd" };
 
 interface Values {
   radius: number;

@@ -181,6 +181,8 @@ pub struct WidgetPreferences {
     pub write_secret: String,
     #[serde(default)]
     pub activity_state_path: String,
+    #[serde(default = "default_shutdown_script_path")]
+    pub shutdown_script_path: String,
 }
 
 fn default_always_on_top() -> bool {
@@ -194,6 +196,9 @@ fn default_sync_role() -> String {
 }
 fn default_source_id() -> String {
     "windows-main".into()
+}
+pub fn default_shutdown_script_path() -> String {
+    r"E:\python\shutdown.cmd".into()
 }
 
 impl Default for WidgetPreferences {
@@ -210,6 +215,7 @@ impl Default for WidgetPreferences {
             source_id: default_source_id(),
             write_secret: String::new(),
             activity_state_path: String::new(),
+            shutdown_script_path: default_shutdown_script_path(),
         }
     }
 }
@@ -232,6 +238,10 @@ impl WidgetPreferences {
             self.source_id = default_source_id();
         }
         self.activity_state_path = self.activity_state_path.trim().to_string();
+        self.shutdown_script_path = self.shutdown_script_path.trim().to_string();
+        if self.shutdown_script_path.is_empty() {
+            self.shutdown_script_path = default_shutdown_script_path();
+        }
         self
     }
 }
@@ -281,6 +291,27 @@ mod tests {
         assert_eq!(prefs.sync_role, "viewer");
         assert_eq!(prefs.server_url, "http://nas.example:8787");
         assert_eq!(prefs.source_id, "windows-main");
+        assert_eq!(prefs.shutdown_script_path, r"E:\python\shutdown.cmd");
+    }
+
+    #[test]
+    fn normalizes_shutdown_script_path_for_older_preferences() {
+        let prefs: WidgetPreferences = serde_json::from_str(
+            r#"{
+            "locked": false,
+            "pinnedProvider": null,
+            "autoRotateSeconds": 12
+        }"#,
+        )
+        .unwrap();
+        assert_eq!(prefs.shutdown_script_path, r"E:\python\shutdown.cmd");
+
+        let trimmed = WidgetPreferences {
+            shutdown_script_path: "  D:\\scripts\\finish.cmd  ".into(),
+            ..WidgetPreferences::default()
+        }
+        .normalized();
+        assert_eq!(trimmed.shutdown_script_path, r"D:\scripts\finish.cmd");
     }
 
     #[test]

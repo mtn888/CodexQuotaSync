@@ -57,4 +57,9 @@ export interface WidgetPreferences {
   serverUrl: string;
   sourceId: string;
   activityStatePath: string;
+  shutdownScriptPath: string;
+}
+
+export interface CompletionShutdownState {
+  armed: boolean;
 }

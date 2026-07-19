@@ -1,4 +1,4 @@
-import type { ProviderSnapshot, WidgetPreferences } from "../types";
+import type { CompletionShutdownState, ProviderSnapshot, WidgetPreferences } from "../types";
 
 const defaultPreferences: WidgetPreferences = {
   locked: false,
@@ -11,6 +11,7 @@ const defaultPreferences: WidgetPreferences = {
   serverUrl: "",
   sourceId: "windows-main",
   activityStatePath: "",
+  shutdownScriptPath: "E:\\python\\shutdown.cmd",
 };
 
 const mockSnapshot: ProviderSnapshot = {
@@ -70,6 +71,46 @@ export async function updatePreferences(value: WidgetPreferences): Promise<void>
   if (!isTauri()) return;
   const { invoke } = await import("@tauri-apps/api/core");
   await invoke("set_preferences", { preferences: value });
+}
+
+export async function getCompletionShutdownState(): Promise<CompletionShutdownState> {
+  if (!isTauri()) return { armed: false };
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<CompletionShutdownState>("get_completion_shutdown_state");
+}
+
+export async function setCompletionShutdownArmed(armed: boolean): Promise<CompletionShutdownState> {
+  if (!isTauri()) return { armed };
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<CompletionShutdownState>("set_completion_shutdown_armed", { armed });
+}
+
+/**
+ * 仅写入 Collector 的密钥；后端不会把该值作为 preferences 返回给 WebView。
+ * 调用方应跳过空字符串，从而保留当前已保存的密钥。
+ */
+export async function setCollectorWriteSecret(secret: string): Promise<void> {
+  if (!isTauri()) return;
+  const { invoke } = await import("@tauri-apps/api/core");
+  await invoke("set_collector_write_secret", { secret });
+}
+
+export async function openSettings(): Promise<void> {
+  if (!isTauri()) return;
+  const { invoke } = await import("@tauri-apps/api/core");
+  await invoke("show_settings");
+}
+
+export async function currentWindowLabel(): Promise<string> {
+  if (!isTauri()) return "widget";
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  return getCurrentWindow().label;
+}
+
+export async function hideCurrentWindow(): Promise<void> {
+  if (!isTauri()) return;
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  await getCurrentWindow().hide();
 }
 
 export async function setClickThrough(locked: boolean): Promise<WidgetPreferences> {
@@ -134,10 +175,19 @@ export function setWidgetExpanded(expanded: boolean): Promise<void> {
 export async function listenDesktopEvents(handlers: {
   onPreferences: (value: WidgetPreferences) => void;
   onRefresh: () => void;
+  onCompletionShutdown?: (value: CompletionShutdownState) => void;
+  onCompletionShutdownNotice?: (message: string) => void;
 }): Promise<() => void> {
   if (!isTauri()) return () => undefined;
   const { listen } = await import("@tauri-apps/api/event");
   const unlistenPreferences = await listen<WidgetPreferences>("preferences-changed", (event) => handlers.onPreferences(event.payload));
   const unlistenRefresh = await listen("refresh-requested", handlers.onRefresh);
-  return () => { unlistenPreferences(); unlistenRefresh(); };
+  const unlistenCompletionShutdown = await listen<CompletionShutdownState>("completion-shutdown-changed", (event) => handlers.onCompletionShutdown?.(event.payload));
+  const unlistenCompletionShutdownNotice = await listen<string>("completion-shutdown-notice", (event) => handlers.onCompletionShutdownNotice?.(event.payload));
+  return () => {
+    unlistenPreferences();
+    unlistenRefresh();
+    unlistenCompletionShutdown();
+    unlistenCompletionShutdownNotice();
+  };
 }

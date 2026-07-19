@@ -17,6 +17,6 @@ Codex Quota Sync 采用本地优先设计。
 
 ## 本地保存
 
-Windows 配置保存在 `%APPDATA%\io.github.mtn888.codexquotasync\preferences.json`。collector 的 HMAC 写密钥保存在该文件中，但 Rust 返回 WebView 的配置会省略密钥字段。Android 只保存服务地址、最后成功快照和获取时间，不持有写密钥。
+Windows 配置保存在 `%APPDATA%\io.github.mtn888.codexquotasync\preferences.json`。collector 的 HMAC 写密钥保存在该文件中；设置页只在 collector 角色下提供一次性写入的密码输入，已保存的密钥不会由 Rust 通过配置或设置事件返回 WebView。填写非空值会替换密钥，留空则保留原值；保存为 viewer 会清除本机密钥。Android 只保存服务地址、最后成功快照和获取时间，不持有写密钥。
 
 项目不包含遥测、分析、崩溃上报或第三方追踪。

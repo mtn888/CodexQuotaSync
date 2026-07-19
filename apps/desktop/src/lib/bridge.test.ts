@@ -40,4 +40,10 @@ describe("widget transitions", () => {
       "end:collapse_widget",
     ]);
   });
+
+  it("passes a Collector write secret only to the write-only command", async () => {
+    const { setCollectorWriteSecret } = await import("./bridge");
+    await setCollectorWriteSecret("new-write-secret");
+    expect(api.invoke).toHaveBeenCalledWith("set_collector_write_secret", { secret: "new-write-secret" });
+  });
 });

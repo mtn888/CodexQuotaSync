@@ -1,4 +1,4 @@
-import { ArrowClockwise, ArrowDown, ArrowUp, ArrowsInSimple, ArrowsOutSimple, ClockCounterClockwise, CloudSlash, Info, PushPin, PushPinSlash, SignIn, WarningCircle } from "@phosphor-icons/react";
+import { ArrowClockwise, ArrowDown, ArrowUp, ArrowsInSimple, ArrowsOutSimple, ClockCounterClockwise, CloudSlash, GearSix, Info, Power, PushPin, PushPinSlash, SignIn, WarningCircle } from "@phosphor-icons/react";
 import { memo, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { activityTone, pendingTaskCount } from "../lib/activityPresentation";
 import { clampPercent, formatDateTime, formatResetTime, quotaTier } from "../lib/format";
@@ -17,6 +17,9 @@ interface Props {
   onDrag: () => void;
   onHover: (hovered: boolean) => void;
   onRefresh?: () => void;
+  completionShutdownArmed?: boolean;
+  onToggleCompletionShutdown?: () => void;
+  onOpenSettings?: () => void;
   isConsuming?: boolean;
   notice?: ReactNode;
   initialShowCreditTip?: boolean;
@@ -70,6 +73,9 @@ export const QuotaCard = memo(function QuotaCard({
   onDrag,
   onHover,
   onRefresh,
+  completionShutdownArmed = false,
+  onToggleCompletionShutdown,
+  onOpenSettings,
   isConsuming = false,
   notice = null,
   initialShowCreditTip = false,
@@ -127,6 +133,12 @@ export const QuotaCard = memo(function QuotaCard({
             <button className={preferences.alwaysOnTop ? "pin-button pin-button--active" : "pin-button"} onClick={onLock} aria-pressed={preferences.alwaysOnTop} aria-label={preferences.alwaysOnTop ? t.pinOff : t.pinOn} title={preferences.alwaysOnTop ? t.pinOff : t.pinOn}>
               {preferences.alwaysOnTop ? <PushPin weight="fill" /> : <PushPinSlash />}
             </button>
+            {preferences.syncRole === "collector" && onToggleCompletionShutdown ? (
+              <button className={completionShutdownArmed ? "shutdown-button shutdown-button--armed" : "shutdown-button"} onClick={onToggleCompletionShutdown} aria-pressed={completionShutdownArmed} aria-label={completionShutdownArmed ? t.completionShutdownOff : t.completionShutdownOn} title={completionShutdownArmed ? t.completionShutdownOff : t.completionShutdownOn}>
+                <Power weight={completionShutdownArmed ? "fill" : "regular"} />
+              </button>
+            ) : null}
+            {onOpenSettings ? <button className="settings-button" onClick={onOpenSettings} aria-label={t.settings} title={t.settings}><GearSix /></button> : null}
           </nav>
         ) : null}
       </header>

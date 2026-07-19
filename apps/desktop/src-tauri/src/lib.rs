@@ -1,6 +1,7 @@
 mod activity;
 mod codex;
 mod models;
+mod shutdown;
 mod sync;
 
 use std::{
@@ -17,7 +18,7 @@ use models::{
     ActivitySnapshot, DesktopSnapshot, ProviderSnapshot, SyncAttempt, SyncEnvelope, SyncView,
     WidgetPreferences,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tauri::{
     menu::{CheckMenuItem, Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -96,6 +97,7 @@ struct WidgetGeometryState {
 }
 
 struct AppState {
+    app_handle: AppHandle,
     client: reqwest::Client,
     preferences: Mutex<WidgetPreferences>,
     preferences_path: PathBuf,
@@ -105,10 +107,17 @@ struct AppState {
     last_good_snapshot: Mutex<Option<ProviderSnapshot>>,
     remote_cache: Mutex<Option<SyncEnvelope>>,
     revision: AtomicU64,
+    completion_shutdown: Mutex<shutdown::ShutdownArm>,
     #[cfg(debug_assertions)]
     simulate_short_window_for_testing: Mutex<bool>,
     geometry: Mutex<Option<WidgetGeometryState>>,
     drag_mode: Mutex<Option<WidgetMode>>,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CompletionShutdownView {
+    armed: bool,
 }
 
 #[cfg(debug_assertions)]
@@ -146,6 +155,57 @@ fn preferences(state: &AppState) -> WidgetPreferences {
         .lock()
         .map(|value| value.clone())
         .unwrap_or_default()
+}
+
+/// Collector 保存普通设置时保留未回显的写入密钥；Viewer 从不保留密钥。
+fn preserve_or_clear_write_secret(
+    mut next: WidgetPreferences,
+    previous: &WidgetPreferences,
+) -> WidgetPreferences {
+    if next.sync_role == "viewer" {
+        next.write_secret.clear();
+    } else if next.write_secret.is_empty() {
+        next.write_secret = previous.write_secret.clone();
+    }
+    next
+}
+
+fn completion_shutdown_view(state: &AppState) -> CompletionShutdownView {
+    CompletionShutdownView {
+        armed: state
+            .completion_shutdown
+            .lock()
+            .map(|value| value.enabled())
+            .unwrap_or(false),
+    }
+}
+
+fn emit_completion_shutdown_changed(state: &AppState) {
+    let value = completion_shutdown_view(state);
+    let _ = state
+        .app_handle
+        .emit_to("widget", "completion-shutdown-changed", value.clone());
+    let _ = state
+        .app_handle
+        .emit_to("settings", "completion-shutdown-changed", value);
+}
+
+fn emit_completion_shutdown_notice(state: &AppState, message: &str) {
+    let _ = state
+        .app_handle
+        .emit_to("widget", "completion-shutdown-notice", message);
+    let _ = state
+        .app_handle
+        .emit_to("settings", "completion-shutdown-notice", message);
+}
+
+fn emit_preferences_changed(state: &AppState, preferences: &WidgetPreferences) {
+    let _ = state
+        .app_handle
+        .emit_to("widget", "preferences-changed", preferences);
+    let _ = state
+        .app_handle
+        .emit_to("settings", "preferences-changed", preferences);
 }
 
 fn is_near_reset(snapshot: &ProviderSnapshot) -> bool {
@@ -310,6 +370,11 @@ async fn collector_dashboard(
 ) -> DesktopSnapshot {
     let attempt = local_quota(state, force_quota).await;
     let activity = current_activity(preferences);
+    let should_shutdown_after_completion = state
+        .completion_shutdown
+        .lock()
+        .map(|mut value| value.observe(&preferences.sync_role, &activity))
+        .unwrap_or(false);
     let last_good = state
         .last_good_snapshot
         .lock()
@@ -347,6 +412,18 @@ async fn collector_dashboard(
             Err(message) => ("offline", Some(message), None),
         }
     };
+
+    if should_shutdown_after_completion {
+        // 先同步“执行中 = 0”的最终状态；无论服务器是否可用，随后都执行用户已武装的本机动作。
+        emit_completion_shutdown_changed(state);
+        match shutdown::launch_script(&preferences.shutdown_script_path) {
+            Ok(()) => eprintln!("completion shutdown script started"),
+            Err(error) => {
+                eprintln!("completion shutdown script failed: {error}");
+                emit_completion_shutdown_notice(state, &error);
+            }
+        }
+    }
 
     let quota = if attempt.status == "ok" || attempt.status == "signed_out" {
         attempt
@@ -498,6 +575,26 @@ mod preference_tests {
 
         let webview_value = serde_json::to_value(&preferences).unwrap();
         assert!(webview_value.get("writeSecret").is_none());
+    }
+
+    #[test]
+    fn collector_keeps_an_omitted_secret_but_viewer_clears_it() {
+        let previous = WidgetPreferences {
+            write_secret: "existing-secret".into(),
+            ..WidgetPreferences::default()
+        };
+        let collector = preserve_or_clear_write_secret(WidgetPreferences::default(), &previous);
+        assert_eq!(collector.write_secret, "existing-secret");
+
+        let viewer = preserve_or_clear_write_secret(
+            WidgetPreferences {
+                sync_role: "viewer".into(),
+                write_secret: "should-not-remain".into(),
+                ..WidgetPreferences::default()
+            },
+            &previous,
+        );
+        assert!(viewer.write_secret.is_empty());
     }
 }
 
@@ -1163,25 +1260,129 @@ fn get_preferences(state: State<'_, AppState>) -> Result<WidgetPreferences, Stri
 }
 
 #[tauri::command]
+fn get_completion_shutdown_state(
+    state: State<'_, AppState>,
+) -> Result<CompletionShutdownView, String> {
+    state
+        .completion_shutdown
+        .lock()
+        .map(|value| CompletionShutdownView {
+            armed: value.enabled(),
+        })
+        .map_err(|_| "完成后关机状态不可用。".into())
+}
+
+#[tauri::command]
+fn set_completion_shutdown_armed(
+    armed: bool,
+    state: State<'_, AppState>,
+) -> Result<CompletionShutdownView, String> {
+    let preferences = preferences(state.inner());
+    if armed {
+        if preferences.sync_role != "collector" {
+            return Err("仅 Collector 可以启用完成后关机。".into());
+        }
+        shutdown::validate_script_path(&preferences.shutdown_script_path)?;
+    }
+
+    let value = state
+        .completion_shutdown
+        .lock()
+        .map_err(|_| "完成后关机状态不可用。".to_string())
+        .map(|mut completion_shutdown| {
+            completion_shutdown.set_enabled(armed);
+            CompletionShutdownView { armed }
+        })?;
+    emit_completion_shutdown_changed(state.inner());
+    Ok(value)
+}
+
+/// 单独接受 Collector 的写入密钥，避免把密钥序列化回 WebView。
+/// 空值是“保持现有密钥”的无操作，绝不用于清空已保存的密钥。
+#[tauri::command]
+fn set_collector_write_secret(secret: String, state: State<'_, AppState>) -> Result<(), String> {
+    if secret.is_empty() {
+        return Ok(());
+    }
+
+    let mut next = state
+        .preferences
+        .lock()
+        .map_err(|_| "settings unavailable".to_string())?
+        .clone();
+    if next.sync_role != "collector" {
+        return Err("仅 Collector 可以保存写入密钥。".into());
+    }
+    next.write_secret = secret;
+    persist_preferences(&state.preferences_path, &next)?;
+    *state
+        .preferences
+        .lock()
+        .map_err(|_| "settings unavailable".to_string())? = next;
+    // 仅修改密钥时，preferences-changed 的依赖项不会变化；主动刷新可让
+    // 新密钥立即用于下一次同步，而不是等待定时器。
+    let _ = state.app_handle.emit_to("widget", "refresh-requested", ());
+    Ok(())
+}
+
+#[tauri::command]
 fn set_preferences(
     preferences: WidgetPreferences,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let mut preferences = preferences.normalized();
-    if preferences.write_secret.is_empty() {
-        preferences.write_secret = state
-            .preferences
-            .lock()
-            .map_err(|_| "settings unavailable".to_string())?
-            .write_secret
-            .clone();
-    }
-    persist_preferences(&state.preferences_path, &preferences)?;
+    let previous = state
+        .preferences
+        .lock()
+        .map_err(|_| "settings unavailable".to_string())?
+        .clone();
+    let next = preserve_or_clear_write_secret(preferences.normalized(), &previous);
+    persist_preferences(&state.preferences_path, &next)?;
     *state
         .preferences
         .lock()
-        .map_err(|_| "settings unavailable".to_string())? = preferences;
+        .map_err(|_| "settings unavailable".to_string())? = next.clone();
+
+    // 设置变更后不能继续把旧服务器或旧角色的快照展示为当前结果。
+    if let Ok(mut cache) = state.dashboard_cache.lock() {
+        *cache = None;
+    }
+    if previous.server_url != next.server_url
+        || previous.source_id != next.source_id
+        || previous.sync_role != next.sync_role
+    {
+        if let Ok(mut cache) = state.remote_cache.lock() {
+            *cache = None;
+        }
+    }
+
+    // Hooks 文件、角色或脚本被切换时，旧任务基线不再可信。要求用户重新武装，
+    // 避免新配置首次读到 0 时触发错误的本机脚本。
+    let should_disarm_completion_shutdown = previous.sync_role != next.sync_role
+        || previous.activity_state_path != next.activity_state_path
+        || previous.shutdown_script_path != next.shutdown_script_path;
+    if should_disarm_completion_shutdown {
+        if let Ok(mut completion_shutdown) = state.completion_shutdown.lock() {
+            completion_shutdown.disable();
+        }
+    }
+    emit_preferences_changed(state.inner(), &next);
+    if should_disarm_completion_shutdown {
+        emit_completion_shutdown_changed(state.inner());
+    }
     Ok(())
+}
+
+#[tauri::command]
+fn show_settings(app: AppHandle) -> Result<(), String> {
+    let window = app
+        .get_webview_window("settings")
+        .ok_or_else(|| "settings window missing".to_string())?;
+    window
+        .show()
+        .map_err(|_| "failed to show settings".to_string())?;
+    window
+        .set_focus()
+        .map_err(|_| "failed to focus settings".to_string())
 }
 
 fn apply_lock(app: &AppHandle, locked: bool) -> Result<(), String> {
@@ -1250,6 +1451,7 @@ fn set_widget_always_on_top(
 fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     let show = MenuItem::with_id(app, "show", "Show / Hide", true, None::<&str>)?;
     let refresh = MenuItem::with_id(app, "refresh", "Refresh now", true, None::<&str>)?;
+    let settings = MenuItem::with_id(app, "settings", "Settings", true, None::<&str>)?;
     let unlock = MenuItem::with_id(app, "unlock", "Unlock widget", true, None::<&str>)?;
     let pin = MenuItem::with_id(app, "pin", "Pin / Unpin Codex", true, None::<&str>)?;
     let language = MenuItem::with_id(
@@ -1291,6 +1493,7 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     if initial_language != "en" {
         let _ = show.set_text("显示 / 隐藏");
         let _ = refresh.set_text("立即刷新");
+        let _ = settings.set_text("设置");
         let _ = unlock.set_text("解锁悬浮窗");
         let _ = pin.set_text("固定 / 取消固定 Codex");
         let _ = language.set_text("Switch to English");
@@ -1303,6 +1506,7 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
         &[
             &show,
             &refresh,
+            &settings,
             &unlock,
             &pin,
             &language,
@@ -1314,7 +1518,9 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     #[cfg(not(debug_assertions))]
     let menu = Menu::with_items(
         app,
-        &[&show, &refresh, &unlock, &pin, &language, &autostart, &quit],
+        &[
+            &show, &refresh, &settings, &unlock, &pin, &language, &autostart, &quit,
+        ],
     )?;
     let mut builder = TrayIconBuilder::with_id("main")
         .menu(&menu)
@@ -1325,6 +1531,7 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     let autostart_menu = autostart.clone();
     let show_menu = show.clone();
     let refresh_menu = refresh.clone();
+    let settings_menu = settings.clone();
     let unlock_menu = unlock.clone();
     let pin_menu = pin.clone();
     let language_menu = language.clone();
@@ -1345,6 +1552,12 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
             }
             "refresh" => {
                 let _ = app.emit_to("widget", "refresh-requested", ());
+            }
+            "settings" => {
+                if let Some(window) = app.get_webview_window("settings") {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
             }
             "debug-short-window" =>
             {
@@ -1402,6 +1615,7 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
                         } else {
                             "立即刷新"
                         });
+                        let _ = settings_menu.set_text(if english { "Settings" } else { "设置" });
                         let _ = unlock_menu.set_text(if english {
                             "Unlock widget"
                         } else {
@@ -1473,6 +1687,7 @@ pub fn run() {
                 .build()
                 .expect("static HTTP client configuration must be valid");
             app.manage(AppState {
+                app_handle: app.handle().clone(),
                 client,
                 preferences: Mutex::new(preferences.clone()),
                 preferences_path,
@@ -1482,6 +1697,7 @@ pub fn run() {
                 last_good_snapshot: Mutex::new(None),
                 remote_cache: Mutex::new(None),
                 revision: AtomicU64::new(0),
+                completion_shutdown: Mutex::new(shutdown::ShutdownArm::default()),
                 #[cfg(debug_assertions)]
                 simulate_short_window_for_testing: Mutex::new(false),
                 geometry: Mutex::new(None),
@@ -1510,6 +1726,10 @@ pub fn run() {
             finish_widget_drag,
             get_preferences,
             set_preferences,
+            get_completion_shutdown_state,
+            set_completion_shutdown_armed,
+            set_collector_write_secret,
+            show_settings,
             set_widget_locked,
             set_widget_always_on_top
         ])
